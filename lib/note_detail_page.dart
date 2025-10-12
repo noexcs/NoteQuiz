@@ -138,8 +138,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     });
   }
 
-  // 新增方法：使用AI填充内容
-  Future<void> _fillContentWithAI() async {
+  // 新增方法：使用AI填充内容（流式输出版本）
+  Future<void> _fillContentWithAIStream() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       if (mounted) {
@@ -156,12 +156,22 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
 
     try {
       final aiService = AIService();
-      final result = await aiService.generateContentFromTitle(title);
-      final content = result['content'] as String? ?? 'AI生成内容失败';
+      final stream = aiService.streamContentFromTitle(title);
+      
+      // 清空当前内容
+      _contentController.text = '';
+      
+      // 流式接收内容并实时显示
+      await for (final content in stream) {
+        if (mounted) {
+          setState(() {
+            _contentController.text += content;
+          });
+        }
+      }
 
       if (mounted) {
         setState(() {
-          _contentController.text = content;
           _isGenerating = false;
         });
         
@@ -385,7 +395,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                       label: const Text('AI生成中...'),
                     )
                   : ElevatedButton.icon(
-                      onPressed: _fillContentWithAI,
+                      onPressed: _fillContentWithAIStream, // 使用流式版本
                       icon: const Icon(Icons.auto_fix_high),
                       label: const Text('AI填充内容'),
                     ),
