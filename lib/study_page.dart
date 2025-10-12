@@ -172,15 +172,21 @@ class _StudyPageState extends State<StudyPage> {
                   const SizedBox(height: 10),
                   ...wrongMultipleChoiceQuestions.map((wrongQ) {
                     return Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(12.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('题目: ${wrongQ['question']}'),
+                            Text('题目: ${wrongQ['question']}',
+                                style: const TextStyle(fontWeight: FontWeight.w500)),
                             const SizedBox(height: 5),
                             Text('你的答案: ${wrongQ['userSelectedIndex'] != null ? wrongQ['options'][wrongQ['userSelectedIndex']] : '未作答'}'),
-                            Text('正确答案: ${wrongQ['options'][wrongQ['correctAnswerIndex']]}', style: const TextStyle(color: Colors.green)),
+                            Text('正确答案: ${wrongQ['options'][wrongQ['correctAnswerIndex']]}', 
+                                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
                             if (wrongQ['explanation'] != null) ...[
                               const SizedBox(height: 5),
                               Text('解析: ${wrongQ['explanation']}'),
@@ -191,7 +197,8 @@ class _StudyPageState extends State<StudyPage> {
                     );
                   }).toList(),
                 ] else ...[
-                  const Text('所有选择题都回答正确！'),
+                  const Text('所有选择题都回答正确！',
+                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
                 ],
                 if (wrongNonMultipleChoiceQuestions.isNotEmpty) ...[
                   const SizedBox(height: 20),
@@ -199,14 +206,20 @@ class _StudyPageState extends State<StudyPage> {
                   const SizedBox(height: 10),
                   ...wrongNonMultipleChoiceQuestions.map((wrongQ) {
                     return Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(12.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('题目: ${wrongQ['question']}'),
+                            Text('题目: ${wrongQ['question']}',
+                                style: const TextStyle(fontWeight: FontWeight.w500)),
                             const SizedBox(height: 5),
-                            Text('参考答案: ${wrongQ['correctAnswers'].join(', ')}', style: const TextStyle(color: Colors.green)),
+                            Text('参考答案: ${wrongQ['correctAnswers'].join(', ')}', 
+                                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
                             if (wrongQ['explanation'] != null) ...[
                               const SizedBox(height: 5),
                               Text('解析: ${wrongQ['explanation']}'),
@@ -248,21 +261,38 @@ class _StudyPageState extends State<StudyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('学习'),
         actions: [
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text('${_currentQuestionIndex + 1}/${_allQuestions.length}'),
+            child: Text('${_currentQuestionIndex + 1}/${_allQuestions.length}',
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                )),
           ),
         ],
       ),
       body: _allQuestions.isEmpty
-          ? const Center(
-              child: Text(
-                '暂无题目，请先添加笔记并生成题目',
-                style: TextStyle(fontSize: 18),
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.quiz_outlined,
+                    size: 80,
+                    color: colorScheme.primary.withOpacity(0.6),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    '暂无题目，请先添加笔记并生成题目',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                ],
               ),
             )
           : Column(
@@ -287,14 +317,32 @@ class _StudyPageState extends State<StudyPage> {
                 // 固定在底部的按钮区域
                 Container(
                   padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.1),
+                        spreadRadius: 1,
+                        blurRadius: 4,
+                        offset: const Offset(0, -1),
+                      ),
+                    ],
+                  ),
                   child: Column(
                     children: [
                       // 只有非选择题才显示"显示答案"按钮
                       if (_allQuestions[_currentQuestionIndex].type != QuestionType.multipleChoice) 
                         Center(
-                          child: ElevatedButton(
+                          child: FilledButton.tonal(
                             onPressed: _toggleAnswer,
-                            child: Text(_showAnswer ? '隐藏答案' : '显示答案'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: Text(_showAnswer ? '隐藏答案' : '显示答案',
+                                style: const TextStyle(fontWeight: FontWeight.w500)),
                           ),
                         ),
                       const SizedBox(height: 10),
@@ -303,19 +351,27 @@ class _StudyPageState extends State<StudyPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            ElevatedButton(
+                            OutlinedButton.icon(
                               onPressed: () => _handleUserJudgment(false),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                               ),
-                              child: const Text('答错了'),
+                              icon: const Icon(Icons.close, size: 18),
+                              label: const Text('答错了'),
                             ),
-                            ElevatedButton(
+                            FilledButton.icon(
                               onPressed: () => _handleUserJudgment(true),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                               ),
-                              child: const Text('答对了'),
+                              icon: const Icon(Icons.check, size: 18),
+                              label: const Text('答对了'),
                             ),
                           ],
                         ),
@@ -324,11 +380,15 @@ class _StudyPageState extends State<StudyPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          ElevatedButton(
+                          FloatingActionButton.extended(
+                            heroTag: "prev_btn",
                             onPressed: _currentQuestionIndex > 0 ? _previousQuestion : null,
-                            child: const Text('上一题'),
+                            icon: const Icon(Icons.arrow_back),
+                            label: const Text('上一题'),
+                            elevation: 0,
                           ),
-                          ElevatedButton(
+                          FloatingActionButton.extended(
+                            heroTag: "next_btn",
                             onPressed: _currentQuestionIndex < _allQuestions.length - 1
                                 ? () {
                                     // 如果是选择题且已作答，或者非选择题且已显示答案并已判断，则自动跳转
@@ -372,7 +432,9 @@ class _StudyPageState extends State<StudyPage> {
                                       }
                                     }
                                   },
-                            child: const Text('下一题'),
+                            icon: const Icon(Icons.arrow_forward),
+                            label: const Text('下一题'),
+                            elevation: 0,
                           ),
                         ],
                       ),
@@ -385,6 +447,8 @@ class _StudyPageState extends State<StudyPage> {
   }
 
   Widget _buildQuestionWidget(AIQuestion question) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     switch (question.type) {
       case QuestionType.multipleChoice:
         final q = question.questionData as MultipleChoiceQuestion;
@@ -392,19 +456,58 @@ class _StudyPageState extends State<StudyPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              q.question,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            ...List.generate(q.options.length, (index) {
-              return ListTile(
-                title: Text(q.options[index]),
-                leading: CircleAvatar(
-                  child: Text('${index + 1}'),
+            Card(
+              elevation: 0,
+              color: colorScheme.primaryContainer.withOpacity(0.7),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  q.question,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
                 ),
-                tileColor: selectedIndex == index ? Colors.blue.withOpacity(0.3) : null,
-                onTap: selectedIndex == null ? () => _handleMultipleChoiceAnswer(index) : null,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...List.generate(q.options.length, (index) {
+              final isSelected = selectedIndex == index;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16), // 增加选项之间的间距
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected 
+                        ? colorScheme.primary 
+                        : colorScheme.outlineVariant,
+                    width: isSelected ? 2 : 1,
+                  ),
+                  color: isSelected 
+                      ? colorScheme.primaryContainer.withOpacity(0.3) 
+                      : colorScheme.surface,
+                ),
+                child: ListTile(
+                  title: Text(q.options[index],
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                        color: isSelected ? colorScheme.primary : null,
+                      )),
+                  leading: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: isSelected 
+                        ? colorScheme.primary 
+                        : colorScheme.secondaryContainer,
+                    foregroundColor: isSelected 
+                        ? colorScheme.onPrimary 
+                        : colorScheme.onSecondaryContainer,
+                    child: Text('${index + 1}'),
+                  ),
+                  onTap: selectedIndex == null ? () => _handleMultipleChoiceAnswer(index) : null,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
               );
             }),
           ],
@@ -414,83 +517,171 @@ class _StudyPageState extends State<StudyPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              q.question,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Card(
+              elevation: 0,
+              color: colorScheme.primaryContainer.withOpacity(0.7),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      q.question,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                    ),
+                    if (q.hint != null) ...[
+                      const SizedBox(height: 10),
+                      Text('提示: ${q.hint}',
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: colorScheme.onSurfaceVariant,
+                          )),
+                    ],
+                  ],
+                ),
+              ),
             ),
-            if (q.hint != null) ...[
-              const SizedBox(height: 10),
-              Text('提示: ${q.hint}'),
-            ],
           ],
         );
       case QuestionType.shortAnswer:
         final q = question.questionData as ShortAnswerQuestion;
-        return Text(
-          q.question,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        return Card(
+          elevation: 0,
+          color: colorScheme.primaryContainer.withOpacity(0.7),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              q.question,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+            ),
+          ),
         );
     }
   }
 
   Widget _buildAnswerWidget(AIQuestion question) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     switch (question.type) {
       case QuestionType.multipleChoice:
         final q = question.questionData as MultipleChoiceQuestion;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '答案:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Card(
+              elevation: 0,
+              color: colorScheme.secondaryContainer.withOpacity(0.3),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '答案:',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 10),
+                    ListTile(
+                      title: Text(q.options[q.correctAnswerIndex],
+                          style: const TextStyle(fontWeight: FontWeight.w500)),
+                      leading: const Icon(Icons.check_circle, color: Colors.green),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tileColor: Colors.green.withOpacity(0.1),
+                    ),
+                    if (q.explanation != null) ...[
+                      const SizedBox(height: 10),
+                      Text('解析: ${q.explanation}'),
+                    ],
+                  ],
+                ),
+              ),
             ),
-            ListTile(
-              title: Text(q.options[q.correctAnswerIndex]),
-              leading: const Icon(Icons.check_circle, color: Colors.green),
-            ),
-            if (q.explanation != null) ...[
-              const SizedBox(height: 10),
-              Text('解析: ${q.explanation}'),
-            ],
           ],
         );
       case QuestionType.fillInBlank:
         final q = question.questionData as FillInBlankQuestion;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '参考答案:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return Card(
+          elevation: 0,
+          color: colorScheme.secondaryContainer.withOpacity(0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '参考答案:',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 10),
+                ...q.correctAnswers.map((answer) => ListTile(
+                      title: Text(answer, style: const TextStyle(fontWeight: FontWeight.w500)),
+                      leading: const Icon(Icons.check_circle, color: Colors.green),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tileColor: Colors.green.withOpacity(0.1),
+                    )).expand((widget) sync* {
+                      yield widget;
+                      yield const SizedBox(height: 8); // 在每个答案项之间添加间距
+                    }).toList(),
+                if (q.explanation != null) ...[
+                  const SizedBox(height: 10),
+                  Text('解析: ${q.explanation}'),
+                ],
+              ],
             ),
-            ...q.correctAnswers.map((answer) => ListTile(
-                  title: Text(answer),
-                  leading: const Icon(Icons.check_circle, color: Colors.green),
-                )),
-            if (q.explanation != null) ...[
-              const SizedBox(height: 10),
-              Text('解析: ${q.explanation}'),
-            ],
-          ],
+          ),
         );
       case QuestionType.shortAnswer:
         final q = question.questionData as ShortAnswerQuestion;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '参考答案:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        return Card(
+          elevation: 0,
+          color: colorScheme.secondaryContainer.withOpacity(0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '参考答案:',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 10),
+                ...q.acceptableAnswers.map((answer) => ListTile(
+                      title: Text(answer, style: const TextStyle(fontWeight: FontWeight.w500)),
+                      leading: const Icon(Icons.check_circle, color: Colors.green),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      tileColor: Colors.green.withOpacity(0.1),
+                    )).expand((widget) sync* {
+                      yield widget;
+                      yield const SizedBox(height: 8); // 在每个答案项之间添加间距
+                    }).toList(),
+                if (q.explanation != null) ...[
+                  const SizedBox(height: 10),
+                  Text('解析: ${q.explanation}'),
+                ],
+              ],
             ),
-            ...q.acceptableAnswers.map((answer) => ListTile(
-                  title: Text(answer),
-                  leading: const Icon(Icons.check_circle, color: Colors.green),
-                )),
-            if (q.explanation != null) ...[
-              const SizedBox(height: 10),
-              Text('解析: ${q.explanation}'),
-            ],
-          ],
+          ),
         );
     }
   }
