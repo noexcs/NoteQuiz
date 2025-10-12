@@ -1,12 +1,16 @@
+import 'package:bd4/ai/ai_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:material_color_utilities/material_color_utilities.dart';
 
 class SettingsPage extends StatefulWidget {
-  final Function(String, [MaterialColor])? onThemeChanged;
-  final MaterialColor? currentSwatch;
-  
-  const SettingsPage({super.key, this.onThemeChanged, this.currentSwatch});
+  final Function(String, [MaterialColor?]) onThemeChanged;
+  final MaterialColor currentSwatch;
+
+  const SettingsPage({
+    super.key,
+    required this.onThemeChanged,
+    required this.currentSwatch,
+  });
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -14,129 +18,122 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final _formKey = GlobalKey<FormState>();
-  
+
+  // Theme state
+  String _currentThemeMode = 'dark';
+
+  // API Settings Controllers
   late TextEditingController _baseUrlController;
   late TextEditingController _apiKeyController;
   late TextEditingController _modelController;
-  late String _currentTheme;
-  late MaterialColor _currentSwatch;
-  
-  static const String _defaultBaseUrl = 'https://api.deepseek.com';
-  static const String _defaultModel = 'deepseek-chat';
-  static const String _defaultTheme = 'dark';
-  
-  // 预定义的颜色选项
-  static final List<MaterialColor> _colorOptions = [
-    Colors.blue,
-    Colors.red,
-    Colors.pink,
-    Colors.purple,
-    Colors.deepPurple,
-    Colors.indigo,
-    Colors.teal,
-    Colors.green,
-    Colors.lightGreen,
-    Colors.lime,
-    Colors.yellow,
-    Colors.orange,
-    Colors.deepOrange,
-    Colors.brown,
-    Colors.grey,
+
+  // Prompt Settings Controllers
+  late TextEditingController _questionSystemPromptController;
+  late TextEditingController _questionUserPromptController;
+  late TextEditingController _contentSystemPromptController;
+  late TextEditingController _contentUserPromptController;
+
+  final List<MaterialColor> _colorOptions = [
+    Colors.blue, Colors.indigo, Colors.purple, Colors.teal, 
+    Colors.green, Colors.amber, Colors.deepOrange, Colors.red, Colors.pink,
+    Colors.cyan, Colors.lime, Colors.brown,
   ];
 
   @override
   void initState() {
-    super.initState();
+    super.initState;
     _baseUrlController = TextEditingController();
     _apiKeyController = TextEditingController();
     _modelController = TextEditingController();
-    _currentTheme = _defaultTheme;
-    _currentSwatch = widget.currentSwatch ?? Colors.blue;
+    _questionSystemPromptController = TextEditingController();
+    _questionUserPromptController = TextEditingController();
+    _contentSystemPromptController = TextEditingController();
+    _contentUserPromptController = TextEditingController();
     _loadSettings();
   }
-  
+
   @override
   void dispose() {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _modelController.dispose();
+    _questionSystemPromptController.dispose();
+    _questionUserPromptController.dispose();
+    _contentSystemPromptController.dispose();
+    _contentUserPromptController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _baseUrlController.text = prefs.getString('api_base_url') ?? _defaultBaseUrl;
+      _currentThemeMode = prefs.getString('app_theme') ?? 'dark';
+
+      _baseUrlController.text = prefs.getString('api_base_url') ?? 'https://api.deepseek.com';
       _apiKeyController.text = prefs.getString('api_key') ?? '';
-      _modelController.text = prefs.getString('api_model') ?? _defaultModel;
-      _currentTheme = prefs.getString('app_theme') ?? _defaultTheme;
-      
-      // 加载自定义主题色
-      final primarySwatchValue = prefs.getInt('primary_swatch') ?? Colors.blue.value;
-      _currentSwatch = MaterialColor(primarySwatchValue, _buildColorSwatch(primarySwatchValue));
+      _modelController.text = prefs.getString('api_model') ?? 'deepseek-chat';
+
+      _questionSystemPromptController.text = prefs.getString('question_system_prompt') ?? '';
+      _questionUserPromptController.text = prefs.getString('question_user_prompt') ?? '';
+      _contentSystemPromptController.text = prefs.getString('content_system_prompt') ?? '';
+      _contentUserPromptController.text = prefs.getString('content_user_prompt') ?? '';
     });
   }
-  
-  // 构建颜色色阶
-  Map<int, Color> _buildColorSwatch(int color) {
-    final colors = <int, Color>{};
-    final baseColor = Color(color);
-    
-    for (int i = 50; i <= 900; i += 100) {
-      colors[i] = baseColor.withOpacity(1 - (i / 1000));
-    }
-    colors[500] = baseColor; // 主色
-    
-    return colors;
-  }
-  
+
   Future<void> _saveSettings() async {
     if (_formKey.currentState!.validate()) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('api_base_url', _baseUrlController.text);
       await prefs.setString('api_key', _apiKeyController.text);
       await prefs.setString('api_model', _modelController.text);
-      await prefs.setString('app_theme', _currentTheme);
-      await prefs.setInt('primary_swatch', _currentSwatch.value);
-      
-      // 通知主应用更新主题
-      widget.onThemeChanged?.call(_currentTheme, _currentSwatch);
-      
-      if (context.mounted) {
+
+      await prefs.setString('question_system_prompt', _questionSystemPromptController.text);
+      await prefs.setString('question_user_prompt', _questionUserPromptController.text);
+      await prefs.setString('content_system_prompt', _contentSystemPromptController.text);
+      await prefs.setString('content_user_prompt', _contentUserPromptController.text);
+
+      // Invalidate the cached settings in AIService
+      await AIService().initialize();
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('设置已保存')),
         );
       }
     }
   }
-  
-  Future<void> _saveTheme(String theme) async {
+
+  Future<void> _updateThemeMode(String themeMode) async {
+    if (themeMode == _currentThemeMode) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('app_theme', theme);
-    await prefs.setInt('primary_swatch', _currentSwatch.value);
+    await prefs.setString('app_theme', themeMode);
+    widget.onThemeChanged(themeMode);
     setState(() {
-      _currentTheme = theme;
+      _currentThemeMode = themeMode;
     });
-    
-    // 通知主应用更新主题
-    widget.onThemeChanged?.call(theme, _currentSwatch);
-    
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('主题已保存')),
-      );
-    }
   }
-  
+
+  Future<void> _updateSwatch(MaterialColor color) async {
+    if (color.value == widget.currentSwatch.value) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('primary_swatch', color.value);
+    widget.onThemeChanged(_currentThemeMode, color);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.save),
+            onPressed: _saveSettings,
+            tooltip: '保存设置',
+          ),
+        ],
       ),
       body: Form(
         key: _formKey,
@@ -145,302 +142,154 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header section with decorative elements
-              Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.only(bottom: 24),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.settings,
-                        color: colorScheme.onPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '系统设置',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '配置应用程序的各项参数',
-                            style: TextStyle(
-                              color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              _buildSectionHeader('AI API 设置', Icons.cloud_queue_outlined, colorScheme),
+              const SizedBox(height: 16),
+              _buildTextFormField(_baseUrlController, 'Base URL', '例如: https://api.deepseek.com'),
+              const SizedBox(height: 16),
+              _buildTextFormField(_apiKeyController, 'API Key', '请输入您的 API 密钥', obscureText: true),
+              const SizedBox(height: 16),
+              _buildTextFormField(_modelController, 'Model', '例如: deepseek-chat'),
+              const SizedBox(height: 24),
+              _buildSectionHeader('AI 提示词设置', Icons.edit_note_outlined, colorScheme),
+              const SizedBox(height: 16),
+              _buildPromptExpansionTile('生成题目', _questionSystemPromptController, _questionUserPromptController, 'You are a professional education assistant...', 'Additional instructions...'),
+              const SizedBox(height: 12),
+              _buildPromptExpansionTile('生成笔记内容', _contentSystemPromptController, _contentUserPromptController, 'You are a professional note-taking assistant...', 'Additional instructions...'),
+              const SizedBox(height: 24),
+              _buildSectionHeader('主题设置', Icons.palette_outlined, colorScheme),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('应用主题'),
+                trailing: SegmentedButton<String>(
+                  segments: const <ButtonSegment<String>>[
+                    ButtonSegment<String>(value: 'light', label: Text('浅色'), icon: Icon(Icons.light_mode_outlined)),
+                    ButtonSegment<String>(value: 'dark', label: Text('深色'), icon: Icon(Icons.dark_mode_outlined)),
                   ],
-                ),
-              ),
-              
-              // AI API Settings Section
-              Text(
-                'AI API 设置',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
+                  selected: {_currentThemeMode},
+                  onSelectionChanged: (newSelection) => _updateThemeMode(newSelection.first),
                 ),
               ),
               const SizedBox(height: 16),
-              
-              // Base URL Field
-              TextFormField(
-                controller: _baseUrlController,
-                decoration: InputDecoration(
-                  labelText: 'Base URL',
-                  hintText: '例如: https://api.openai.com/v1',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入 Base URL';
-                  }
-                  return null;
-                },
+              const ListTile(
+                title: Text('主题颜色'),
               ),
-              const SizedBox(height: 16),
-              
-              // API Key Field
-              TextFormField(
-                controller: _apiKeyController,
-                decoration: InputDecoration(
-                  labelText: 'API Key',
-                  hintText: '请输入您的 API 密钥',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入 API Key';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              
-              // Model Field
-              TextFormField(
-                controller: _modelController,
-                decoration: InputDecoration(
-                  labelText: 'Model',
-                  hintText: '例如: gpt-3.5-turbo',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入 Model';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              
-              // Theme Settings Section
-              Text(
-                '主题设置',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Theme Selection Cards
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      color: _currentTheme == 'light' 
-                        ? colorScheme.primaryContainer 
-                        : colorScheme.surfaceVariant,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: InkWell(
-                        onTap: () => _saveTheme('light'),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.light_mode,
-                                size: 32,
-                                color: _currentTheme == 'light' 
-                                  ? colorScheme.onPrimaryContainer 
-                                  : colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '浅色模式',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  color: _currentTheme == 'light' 
-                                    ? colorScheme.onPrimaryContainer 
-                                    : colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      color: _currentTheme == 'dark' 
-                        ? colorScheme.primaryContainer 
-                        : colorScheme.surfaceVariant,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: InkWell(
-                        onTap: () => _saveTheme('dark'),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.dark_mode,
-                                size: 32,
-                                color: _currentTheme == 'dark' 
-                                  ? colorScheme.onPrimaryContainer 
-                                  : colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '深色模式',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  color: _currentTheme == 'dark' 
-                                    ? colorScheme.onPrimaryContainer 
-                                    : colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              // Color Selection Section
-              Text(
-                '主题颜色',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Color Selection Grid
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 10,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: _colorOptions.length,
-                itemBuilder: (context, index) {
-                  final color = _colorOptions[index];
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _currentSwatch = color;
-                      });
-                      // 立即应用颜色变化
-                      widget.onThemeChanged?.call(_currentTheme, _currentSwatch);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: _currentSwatch == color
-                            ? Border.all(
-                                color: colorScheme.onSurface,
-                                width: 2,
-                              )
-                            : null,
-                      ),
-                      child: _currentSwatch == color
-                          ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 16,
-                            )
-                          : null,
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-              
-              // Save Button
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _saveSettings,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    '保存设置',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+              const SizedBox(height: 8),
+              _buildColorPicker(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon, ColorScheme colorScheme) {
+    return Row(
+      children: [
+        Icon(icon, color: colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.primary)),
+      ],
+    );
+  }
+  
+  Widget _buildTextFormField(
+    TextEditingController controller,
+    String label,
+    String hint, {
+    bool obscureText = false,
+    int minLines = 1,
+    int maxLines = 1,
+  }) {
+    return TextFormField(
+      controller: controller,
+      minLines: minLines,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        alignLabelWithHint: true,
+      ),
+      obscureText: obscureText,
+      validator: (value) {
+        if (['API Key', 'Model', 'Base URL'].contains(label)) {
+           if (value == null || value.isEmpty) return '请输入 $label';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildPromptExpansionTile(
+    String title,
+    TextEditingController systemController,
+    TextEditingController userController,
+    String systemHint,
+    String userHint,
+  ) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Theme.of(context).colorScheme.outline.withOpacity(0.3)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: ExpansionTile(
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('系统提示词 (System Prompt)', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _buildTextFormField(
+            systemController,
+            'System Prompt',
+            systemHint,
+            minLines: 3,
+            maxLines: 8,
+          ),
+          const SizedBox(height: 16),
+          Text('用户附加提示词 (User Prompt)', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _buildTextFormField(
+            userController,
+            'User Prompt',
+            userHint,
+            minLines: 3,
+            maxLines: 8,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColorPicker() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: _colorOptions.map((color) {
+          final isSelected = widget.currentSwatch.value == color.value;
+          return GestureDetector(
+            onTap: () => _updateSwatch(color),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: isSelected ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3) : null,
+              ),
+              child: isSelected ? const Icon(Icons.check, color: Colors.white) : null,
+            ),
+          );
+        }).toList(),
       ),
     );
   }
