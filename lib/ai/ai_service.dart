@@ -1,0 +1,144 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+class AIService {
+  static const String _defaultBaseUrl = 'https://api.deepseek.com';
+  static const String _defaultModel = 'deepseek-chat';
+  
+  String _baseUrl = _defaultBaseUrl;
+  String _apiKey = '';
+  String _model = _defaultModel;
+  
+  static final AIService _instance = AIService._internal();
+  factory AIService() => _instance;
+  AIService._internal();
+  
+  Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    _baseUrl = prefs.getString('api_base_url') ?? _defaultBaseUrl;
+    _apiKey = prefs.getString('api_key') ?? '';
+    _model = prefs.getString('api_model') ?? _defaultModel;
+  }
+  
+  Future<Map<String, dynamic>> generateQuestions({
+    required String content,
+    required String questionType,
+    required int count,
+  }) async {
+    await initialize();
+    
+    final url = Uri.parse('$_baseUrl/chat/completions');
+    
+    // 根据中文类型转换为英文标识符
+    String typeIdentifier = '';
+    switch (questionType) {
+      case '选择题':
+        typeIdentifier = 'multiple choice';
+        break;
+      case '填空题':
+        typeIdentifier = 'fill in the blank';
+        break;
+      case '问答题':
+        typeIdentifier = 'short answer';
+        break;
+      default:
+        typeIdentifier = 'mixed types';
+        break;
+    }
+    
+    final messages = [
+      {
+        'role': 'system',
+        'content': '''
+You are a professional education assistant who specializes in generating test questions based on text content. 
+Return ONLY valid JSON data in the exact format specified, with no additional text.
+Questions should be in Simplified Chinese.
+''',
+      },
+      {
+        'role': 'user',
+        'content': '''
+Based on the following text content, generate $count $questionType questions:
+
+"$content"
+
+Requirements for question generation:
+1. Multiple Choice: Include question, options list, correct answer index (0-based), and explanation
+2. Fill in the Blank: Include question with blank (______), correct answers list, hint, and explanation
+3. Short Answer: Include question, acceptable answers list, and explanation
+
+Return ONLY a valid JSON object in this exact format with no additional text:
+{
+  "questions": [
+    {
+      "type": "multipleChoice",
+      "data": {
+        "question": "Question text",
+        "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+        "correctAnswerIndex": 0,
+        "explanation": "Explanation text"
+      }
+    },
+    {
+      "type": "fillInBlank",
+      "data": {
+        "question": "Question with blank ______",
+        "correctAnswers": ["answer1", "answer2"],
+        "hint": "Hint text",
+        "explanation": "Explanation text"
+      }
+    },
+    {
+      "type": "shortAnswer",
+      "data": {
+        "question": "Question text",
+        "acceptableAnswers": ["answer1", "answer2"],
+        "explanation": "Explanation text"
+      }
+    }
+  ]
+}
+''',
+      },
+    ];
+    
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': messages,
+          'temperature': 0.7,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'];
+        
+        // 尝试解析返回的JSON
+        try {
+          return jsonDecode(content);
+        } catch (e) {
+          // 如果解析失败，可能是格式问题，尝试提取其中的JSON部分
+          final jsonStart = content.indexOf('{');
+          final jsonEnd = content.lastIndexOf('}') + 1;
+          if (jsonStart != -1 && jsonEnd > jsonStart) {
+            final jsonString = content.substring(jsonStart, jsonEnd);
+            return jsonDecode(jsonString);
+          }
+          rethrow;
+        }
+      } else {
+        throw Exception('API请求失败: ${response.statusCode}, ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('生成题目时出错: $e');
+      }
+  }
+}
