@@ -3,6 +3,7 @@ import 'notes/note_new.dart';
 import 'note_service.dart';
 import 'ai/ai_question.dart';
 import 'ai/ai_service.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class NoteDetailPage extends StatefulWidget {
   final Note note;
@@ -228,15 +229,11 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: TextField(
-              controller: _contentController,
-              decoration: const InputDecoration(
-                labelText: '内容',
-              ),
-              maxLines: null,
-              expands: true,
-              textAlignVertical: TextAlignVertical.top,
-            ),
+            child: _contentController.text.isNotEmpty
+                ? SingleChildScrollView(
+                    child: MarkdownBody(data: _contentController.text),
+                  )
+                : const Text('暂无内容'),
           ),
         ],
       ),
