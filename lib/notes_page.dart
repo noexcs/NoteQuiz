@@ -37,7 +37,7 @@ class _NotesPageState extends State<NotesPage> {
   Future<void> _addNote() async {
     final newNote = Note(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: '新笔记',
+      title: '', // 默认标题为空
       content: '',
     );
 

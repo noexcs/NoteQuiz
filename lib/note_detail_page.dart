@@ -22,6 +22,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   late Note _currentNote;
   bool _isEditing = false; // 添加编辑状态标志
   bool _isGenerating = false; // 添加AI生成状态标志
+  String _initialTitle = ''; // 记录初始标题
+  String _initialContent = ''; // 记录初始内容
 
   @override
   void initState() {
@@ -32,6 +34,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     _currentNote = widget.note;
     // 如果是新增笔记（假设内容为空表示新增），则默认进入编辑模式
     _isEditing = widget.note.content.isEmpty;
+    
+    // 记录初始值用于比较
+    _initialTitle = widget.note.title;
+    _initialContent = widget.note.content;
   }
 
   @override
@@ -42,6 +48,53 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     super.dispose();
   }
 
+  // 检查笔记是否有未保存的更改
+  bool _hasUnsavedChanges() {
+    return _titleController.text != _initialTitle || _contentController.text != _initialContent;
+  }
+
+  // 处理返回操作
+  Future<bool> _onWillPop() async {
+    if (_hasUnsavedChanges()) {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('保存笔记'),
+            content: const Text('您有未保存的更改，是否保存后再退出？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false), // 不保存
+                child: const Text('不保存'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true), // 保存
+                child: const Text('保存'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null), // 取消
+                child: const Text('取消'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (result == true) {
+        // 用户选择保存
+        _saveNote();
+        return true; // 允许退出
+      } else if (result == false) {
+        // 用户选择不保存
+        return true; // 允许退出
+      } else {
+        // 用户选择取消
+        return false; // 阻止退出
+      }
+    }
+    return true; // 没有未保存的更改，允许退出
+  }
+
   void _toggleEdit() {
     setState(() {
       _isEditing = !_isEditing;
@@ -49,17 +102,36 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   }
 
   void _saveNote() {
+    // 如果标题为空，则使用内容的前几个字符作为标题
+    String noteTitle = _titleController.text;
+    if (noteTitle.isEmpty) {
+      // 使用内容的前20个字符作为标题，去除换行符
+      String content = _contentController.text;
+      noteTitle = content.replaceAll('\n', ' ').trim();
+      if (noteTitle.length > 20) {
+        noteTitle = noteTitle.substring(0, 20) + '...';
+      }
+      
+      // 如果内容也为空，则使用默认标题
+      if (noteTitle.isEmpty) {
+        noteTitle = '未命名笔记';
+      }
+    }
+
     final updatedNote = _currentNote.copyWith(
-      title: _titleController.text,
+      title: noteTitle,
       content: _contentController.text,
       updatedAt: DateTime.now(),
     );
     
     widget.noteService.updateNote(updatedNote).then((_) {
       if (mounted) {
-        // 保存后退出编辑模式
+        // 保存后更新初始值
         setState(() {
+          _initialTitle = noteTitle;
+          _initialContent = _contentController.text;
           _isEditing = false;
+          _titleController.text = noteTitle; // 更新标题控制器的文本
         });
         Navigator.pop(context, updatedNote);
       }
@@ -243,37 +315,40 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('笔记详情'),
-        actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.visibility : Icons.edit),
-            onPressed: _toggleEdit,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('笔记详情'),
+          actions: [
+            IconButton(
+              icon: Icon(_isEditing ? Icons.visibility : Icons.edit),
+              onPressed: _toggleEdit,
+            ),
+            IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: _saveNote,
+            ),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: [
+              const Tab(text: '笔记详情'),
+              Tab(text: '选择题(${_currentNote.questions.where((q) => q.type == QuestionType.multipleChoice).length})'),
+              Tab(text: '填空题(${_currentNote.questions.where((q) => q.type == QuestionType.fillInBlank).length})'),
+              Tab(text: '简答题(${_currentNote.questions.where((q) => q.type == QuestionType.shortAnswer).length})'),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveNote,
-          ),
-        ],
-        bottom: TabBar(
+        ),
+        body: TabBarView(
           controller: _tabController,
-          tabs: [
-            const Tab(text: '笔记详情'),
-            Tab(text: '选择题(${_currentNote.questions.where((q) => q.type == QuestionType.multipleChoice).length})'),
-            Tab(text: '填空题(${_currentNote.questions.where((q) => q.type == QuestionType.fillInBlank).length})'),
-            Tab(text: '简答题(${_currentNote.questions.where((q) => q.type == QuestionType.shortAnswer).length})'),
+          children: [
+            _buildNoteDetailTab(),
+            _buildMultipleChoiceQuestionsTab(),
+            _buildFillInBlankQuestionsTab(),
+            _buildShortAnswerQuestionsTab(),
           ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildNoteDetailTab(),
-          _buildMultipleChoiceQuestionsTab(),
-          _buildFillInBlankQuestionsTab(),
-          _buildShortAnswerQuestionsTab(),
-        ],
       ),
     );
   }
@@ -287,6 +362,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
             controller: _titleController,
             decoration: const InputDecoration(
               labelText: '标题',
+              hintText: '请输入笔记标题', // 添加placeholder提示
             ),
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
