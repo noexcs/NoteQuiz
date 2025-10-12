@@ -68,12 +68,20 @@ class _NotesPageState extends State<NotesPage> {
 
   Future<void> _addDirectory() async {
     final TextEditingController controller = TextEditingController();
+    final FocusNode focusNode = FocusNode(); // 创建焦点节点
+    
+    // 在下一帧请求焦点
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      focusNode.requestFocus();
+    });
+    
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('添加新目录'),
         content: TextField(
           controller: controller,
+          focusNode: focusNode, // 设置焦点节点
           decoration: const InputDecoration(
             labelText: '目录名称',
             hintText: '请输入目录名称',
@@ -106,6 +114,9 @@ class _NotesPageState extends State<NotesPage> {
         ],
       ),
     );
+    
+    // 释放焦点节点资源
+    focusNode.dispose();
 
     if (result != null && mounted) {
       // 创建目录的完整路径
@@ -124,12 +135,20 @@ class _NotesPageState extends State<NotesPage> {
   // 目录重命名方法
   Future<void> _renameDirectory(String oldDirectoryName) async {
     final TextEditingController controller = TextEditingController(text: oldDirectoryName);
+    final FocusNode focusNode = FocusNode(); // 创建焦点节点
+    
+    // 在下一帧请求焦点
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      focusNode.requestFocus();
+    });
+    
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('重命名目录'),
         content: TextField(
           controller: controller,
+          focusNode: focusNode, // 设置焦点节点
           decoration: const InputDecoration(
             labelText: '新目录名称',
             hintText: '请输入新目录名称',
@@ -162,6 +181,9 @@ class _NotesPageState extends State<NotesPage> {
         ],
       ),
     );
+    
+    // 释放焦点节点资源
+    focusNode.dispose();
 
     if (result != null && mounted) {
       // 构建完整路径

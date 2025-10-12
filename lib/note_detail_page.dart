@@ -24,6 +24,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   bool _isGenerating = false; // 添加AI生成状态标志
   String _initialTitle = ''; // 记录初始标题
   String _initialContent = ''; // 记录初始内容
+  FocusNode? _titleFocusNode; // 标题输入框焦点节点
 
   @override
   void initState() {
@@ -38,6 +39,18 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     // 记录初始值用于比较
     _initialTitle = widget.note.title;
     _initialContent = widget.note.content;
+    
+    // 初始化焦点节点
+    _titleFocusNode = FocusNode();
+    
+    // 如果是新笔记，延迟请求焦点以确保widget已构建完成
+    if (widget.note.title.isEmpty && widget.note.content.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _titleFocusNode?.requestFocus();
+        }
+      });
+    }
   }
 
   @override
@@ -45,6 +58,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     _titleController.dispose();
     _contentController.dispose();
     _tabController.dispose();
+    _titleFocusNode?.dispose(); // 释放焦点节点资源
     super.dispose();
   }
 
@@ -375,6 +389,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
               hintText: '请输入笔记标题', // 添加placeholder提示
             ),
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            // 使用专门创建的FocusNode
+            focusNode: _titleFocusNode,
           ),
           const SizedBox(height: 16),
           // 在编辑模式下显示AI填充按钮
