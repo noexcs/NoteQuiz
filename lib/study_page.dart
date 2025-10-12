@@ -425,67 +425,6 @@ class _StudyPageState extends State<StudyPage> {
                         ),
                         const SizedBox(height: 10),
                       ],
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          FloatingActionButton.extended(
-                            heroTag: "prev_btn",
-                            onPressed: _currentQuestionIndex > 0 ? _previousQuestion : null,
-                            icon: const Icon(Icons.arrow_back),
-                            label: const Text('上一题'),
-                            elevation: 0,
-                          ),
-                          FloatingActionButton.extended(
-                            heroTag: "next_btn",
-                            onPressed: _currentQuestionIndex < _allQuestions.length - 1
-                                ? () {
-                                    // 如果是选择题且已作答，或者非选择题且已显示答案并已判断，则自动跳转
-                                    final isMultipleChoice = _allQuestions[_currentQuestionIndex].type == QuestionType.multipleChoice;
-                                    final hasAnswered = _selectedOptions[_currentQuestionIndex] != null;
-                                    final hasShownAnswer = _showAnswer;
-                                    final hasJudged = _userAnswers[_currentQuestionIndex] != null;
-                                    
-                                    if ((isMultipleChoice && hasAnswered) || 
-                                        (!isMultipleChoice && hasShownAnswer && hasJudged)) {
-                                      setState(() {
-                                        if (_currentQuestionIndex < _allQuestions.length - 1) {
-                                          _currentQuestionIndex++;
-                                          _showAnswer = false;
-                                        } else {
-                                          _showQuizResults();
-                                        }
-                                      });
-                                    } else {
-                                      // 对于非选择题，如果还没显示答案，则显示答案
-                                      if (!isMultipleChoice && !hasShownAnswer) {
-                                        _toggleAnswer();
-                                      }
-                                    }
-                                  }
-                                : () {
-                                    // 最后一题，检查是否需要显示答案或直接显示结果
-                                    final isMultipleChoice = _allQuestions[_currentQuestionIndex].type == QuestionType.multipleChoice;
-                                    final hasAnswered = _selectedOptions[_currentQuestionIndex] != null;
-                                    final hasShownAnswer = _showAnswer;
-                                    final hasJudged = _userAnswers[_currentQuestionIndex] != null;
-                                    
-                                    if (isMultipleChoice && hasAnswered) {
-                                      _showQuizResults();
-                                    } else if (!isMultipleChoice && hasShownAnswer && hasJudged) {
-                                      _showQuizResults();
-                                    } else {
-                                      // 还没有完成最后一步操作
-                                      if (!isMultipleChoice && !hasShownAnswer) {
-                                        _toggleAnswer();
-                                      }
-                                    }
-                                  },
-                            icon: const Icon(Icons.arrow_forward),
-                            label: const Text('下一题'),
-                            elevation: 0,
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
