@@ -92,96 +92,98 @@ class _SettingsPageState extends State<SettingsPage> {
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'AI API 设置',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _baseUrlController,
-                decoration: const InputDecoration(
-                  labelText: 'Base URL',
-                  hintText: '例如: https://api.openai.com/v1',
-                  border: OutlineInputBorder(),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'AI API 设置',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入 Base URL';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _apiKeyController,
-                decoration: const InputDecoration(
-                  labelText: 'API Key',
-                  hintText: '请输入您的 API 密钥',
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入 API Key';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _modelController,
-                decoration: const InputDecoration(
-                  labelText: 'Model',
-                  hintText: '例如: gpt-3.5-turbo',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入 Model';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                '主题设置',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ChoiceChip(
-                    label: const Text('浅色模式'),
-                    selected: _currentTheme == 'light',
-                    onSelected: (selected) {
-                      if (selected) {
-                        _saveTheme('light');
-                      }
-                    },
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _baseUrlController,
+                  decoration: const InputDecoration(
+                    labelText: 'Base URL',
+                    hintText: '例如: https://api.openai.com/v1',
+                    border: OutlineInputBorder(),
                   ),
-                  ChoiceChip(
-                    label: const Text('深色模式'),
-                    selected: _currentTheme == 'dark',
-                    onSelected: (selected) {
-                      if (selected) {
-                        _saveTheme('dark');
-                      }
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _saveSettings,
-                  child: const Text('保存设置'),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return '请输入 Base URL';
+                    }
+                    return null;
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _apiKeyController,
+                  decoration: const InputDecoration(
+                    labelText: 'API Key',
+                    hintText: '请输入您的 API 密钥',
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return '请输入 API Key';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _modelController,
+                  decoration: const InputDecoration(
+                    labelText: 'Model',
+                    hintText: '例如: gpt-3.5-turbo',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return '请输入 Model';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  '主题设置',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('浅色模式'),
+                      selected: _currentTheme == 'light',
+                      onSelected: (selected) {
+                        if (selected) {
+                          _saveTheme('light');
+                        }
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('深色模式'),
+                      selected: _currentTheme == 'dark',
+                      onSelected: (selected) {
+                        if (selected) {
+                          _saveTheme('dark');
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Center(
+                  child: ElevatedButton(
+                    onPressed: _saveSettings,
+                    child: const Text('保存设置'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
