@@ -1,6 +1,39 @@
+import 'dart:convert';
 import 'package:bd4/ai/ai_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class ApiConfig {
+  String name;
+  String baseUrl;
+  String apiKey;
+  String model;
+
+  ApiConfig({
+    required this.name,
+    required this.baseUrl,
+    required this.apiKey,
+    required this.model,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'baseUrl': baseUrl,
+      'apiKey': apiKey,
+      'model': model,
+    };
+  }
+
+  factory ApiConfig.fromJson(Map<String, dynamic> json) {
+    return ApiConfig(
+      name: json['name'] ?? '默认配置',
+      baseUrl: json['baseUrl'] ?? 'https://api.deepseek.com',
+      apiKey: json['apiKey'] ?? '',
+      model: json['model'] ?? 'deepseek-chat',
+    );
+  }
+}
 
 class SettingsPage extends StatefulWidget {
   final Function(String, [MaterialColor?]) onThemeChanged;
@@ -26,6 +59,11 @@ class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _baseUrlController;
   late TextEditingController _apiKeyController;
   late TextEditingController _modelController;
+  late TextEditingController _configNameController;
+
+  // Multi-API configs
+  List<ApiConfig> _apiConfigs = [];
+  int _currentConfigIndex = 0;
 
   // Prompt Settings Controllers
   late TextEditingController _questionSystemPromptController;
@@ -41,10 +79,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   void initState() {
-    super.initState;
+    super.initState();
     _baseUrlController = TextEditingController();
     _apiKeyController = TextEditingController();
     _modelController = TextEditingController();
+    _configNameController = TextEditingController();
     _questionSystemPromptController = TextEditingController();
     _questionUserPromptController = TextEditingController();
     _contentSystemPromptController = TextEditingController();
@@ -57,6 +96,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _modelController.dispose();
+    _configNameController.dispose();
     _questionSystemPromptController.dispose();
     _questionUserPromptController.dispose();
     _contentSystemPromptController.dispose();
@@ -69,9 +109,37 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _currentThemeMode = prefs.getString('app_theme') ?? 'dark';
 
-      _baseUrlController.text = prefs.getString('api_base_url') ?? 'https://api.deepseek.com';
-      _apiKeyController.text = prefs.getString('api_key') ?? '';
-      _modelController.text = prefs.getString('api_model') ?? 'deepseek-chat';
+      // Load API configs
+      final configsString = prefs.getString('api_configs');
+      if (configsString != null) {
+        final List<dynamic> configsJson = jsonDecode(configsString);
+        _apiConfigs = configsJson
+            .map((config) => ApiConfig.fromJson(config as Map<String, dynamic>))
+            .toList();
+      } else {
+        // Load default config if no configs exist
+        _apiConfigs = [
+          ApiConfig(
+            name: '默认配置',
+            baseUrl: prefs.getString('api_base_url') ?? 'https://api.deepseek.com',
+            apiKey: prefs.getString('api_key') ?? '',
+            model: prefs.getString('api_model') ?? 'deepseek-chat',
+          )
+        ];
+      }
+
+      // Get current config index
+      _currentConfigIndex = prefs.getInt('current_api_config_index') ?? 0;
+      if (_currentConfigIndex >= _apiConfigs.length) {
+        _currentConfigIndex = 0;
+      }
+
+      // Load current config into controllers
+      final currentConfig = _apiConfigs[_currentConfigIndex];
+      _configNameController.text = currentConfig.name;
+      _baseUrlController.text = currentConfig.baseUrl;
+      _apiKeyController.text = currentConfig.apiKey;
+      _modelController.text = currentConfig.model;
 
       _questionSystemPromptController.text = prefs.getString('question_system_prompt') ?? '';
       _questionUserPromptController.text = prefs.getString('question_user_prompt') ?? '';
@@ -83,9 +151,19 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveSettings() async {
     if (_formKey.currentState!.validate()) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('api_base_url', _baseUrlController.text);
-      await prefs.setString('api_key', _apiKeyController.text);
-      await prefs.setString('api_model', _modelController.text);
+      
+      // Update current config with form values
+      _apiConfigs[_currentConfigIndex] = ApiConfig(
+        name: _configNameController.text,
+        baseUrl: _baseUrlController.text,
+        apiKey: _apiKeyController.text,
+        model: _modelController.text,
+      );
+
+      // Save API configs
+      final configsJson = _apiConfigs.map((config) => config.toJson()).toList();
+      await prefs.setString('api_configs', jsonEncode(configsJson));
+      await prefs.setInt('current_api_config_index', _currentConfigIndex);
 
       await prefs.setString('question_system_prompt', _questionSystemPromptController.text);
       await prefs.setString('question_user_prompt', _questionUserPromptController.text);
@@ -101,6 +179,53 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
     }
+  }
+
+  void _addNewConfig() {
+    setState(() {
+      _apiConfigs.add(ApiConfig(
+        name: '新配置 ${_apiConfigs.length + 1}',
+        baseUrl: 'https://api.deepseek.com',
+        apiKey: '',
+        model: 'deepseek-chat',
+      ));
+      _currentConfigIndex = _apiConfigs.length - 1;
+      _updateConfigFormFields();
+    });
+  }
+
+  void _deleteCurrentConfig() {
+    if (_apiConfigs.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('至少需要保留一个配置')),
+      );
+      return;
+    }
+
+    setState(() {
+      _apiConfigs.removeAt(_currentConfigIndex);
+      if (_currentConfigIndex >= _apiConfigs.length) {
+        _currentConfigIndex = _apiConfigs.length - 1;
+      }
+      _updateConfigFormFields();
+    });
+  }
+
+  void _switchToConfig(int index) {
+    if (index != _currentConfigIndex) {
+      setState(() {
+        _currentConfigIndex = index;
+        _updateConfigFormFields();
+      });
+    }
+  }
+
+  void _updateConfigFormFields() {
+    final currentConfig = _apiConfigs[_currentConfigIndex];
+    _configNameController.text = currentConfig.name;
+    _baseUrlController.text = currentConfig.baseUrl;
+    _apiKeyController.text = currentConfig.apiKey;
+    _modelController.text = currentConfig.model;
   }
 
   Future<void> _updateThemeMode(String themeMode) async {
@@ -144,11 +269,17 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _buildSectionHeader('AI API 设置', Icons.cloud_queue_outlined, colorScheme),
               const SizedBox(height: 16),
+              _buildConfigSelector(),
+              const SizedBox(height: 16),
+              _buildTextFormField(_configNameController, '配置名称', '例如: 默认配置'),
+              const SizedBox(height: 16),
               _buildTextFormField(_baseUrlController, 'Base URL', '例如: https://api.deepseek.com'),
               const SizedBox(height: 16),
               _buildTextFormField(_apiKeyController, 'API Key', '请输入您的 API 密钥', obscureText: true),
               const SizedBox(height: 16),
               _buildTextFormField(_modelController, 'Model', '例如: deepseek-chat'),
+              const SizedBox(height: 16),
+              _buildConfigManagementButtons(),
               const SizedBox(height: 24),
               _buildSectionHeader('AI 提示词设置', Icons.edit_note_outlined, colorScheme),
               const SizedBox(height: 16),
@@ -291,6 +422,58 @@ class _SettingsPageState extends State<SettingsPage> {
           );
         }).toList(),
       ),
+    );
+  }
+
+  Widget _buildConfigSelector() {
+    return FormField<int>(
+      builder: (FormFieldState<int> state) {
+        return InputDecorator(
+          decoration: InputDecoration(
+            labelText: '当前配置',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _currentConfigIndex,
+              isDense: true,
+              onChanged: (int? newValue) {
+                if (newValue != null) {
+                  _switchToConfig(newValue);
+                }
+              },
+              items: _apiConfigs.asMap().entries.map((entry) {
+                int idx = entry.key;
+                ApiConfig config = entry.value;
+                return DropdownMenuItem<int>(
+                  value: idx,
+                  child: Text(config.name),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildConfigManagementButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _addNewConfig,
+          icon: const Icon(Icons.add),
+          label: const Text('添加配置'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _deleteCurrentConfig,
+          icon: const Icon(Icons.delete),
+          label: const Text('删除配置'),
+        ),
+      ],
     );
   }
 }
