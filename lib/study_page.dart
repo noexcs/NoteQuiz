@@ -22,6 +22,7 @@ class _StudyPageState extends State<StudyPage> {
   List<AIQuestion> _allQuestions = [];
   List<int> _questionToNoteIndex = [];
   int _currentQuestionIndex = 0;
+  int _slideDirection = 1;
   bool _showAnswer = false;
 
   DateTime? _startTime;
@@ -105,6 +106,7 @@ class _StudyPageState extends State<StudyPage> {
   void _previousQuestion() {
     if (_currentQuestionIndex > 0) {
       setState(() {
+        _slideDirection = -1;
         _currentQuestionIndex--;
         _showAnswer = _userAnswers[_currentQuestionIndex] != null;
       });
@@ -114,8 +116,10 @@ class _StudyPageState extends State<StudyPage> {
   void _nextQuestion() {
     if (_currentQuestionIndex < _allQuestions.length - 1) {
       setState(() {
+        _slideDirection = 1;
         _currentQuestionIndex++;
-        _showAnswer = false;
+        // Restore the answer visibility if the user has already answered this question.
+        _showAnswer = _userAnswers[_currentQuestionIndex] != null;
       });
     }
   }
@@ -283,16 +287,27 @@ class _StudyPageState extends State<StudyPage> {
       padding: const EdgeInsets.all(16.0),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
+        layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+          return Stack(
+            alignment: Alignment.topCenter,
+            children: <Widget>[
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          );
+        },
         transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.3, 0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
+          // The animation logic was correct, the issue was layout.
+          // The exiting child's animation is the reverse of the entering child's.
+          // Let's use the original logic which was verified to be correct.
+          final isEntering = (child.key as ValueKey<int>).value == _currentQuestionIndex;
+          final offset = isEntering
+              ? Tween<Offset>(begin: Offset(_slideDirection.toDouble(), 0), end: Offset.zero)
+              : Tween<Offset>(begin: Offset(-_slideDirection.toDouble(), 0), end: Offset.zero);
+
+          return SlideTransition(
+            position: offset.animate(animation),
+            child: child,
           );
         },
         child: Column(
@@ -320,6 +335,40 @@ class _StudyPageState extends State<StudyPage> {
     final isMcq = question.type == QuestionType.multipleChoice;
     final hasAnswered = _userAnswers[_currentQuestionIndex] != null;
 
+    Widget centerWidget;
+    if (!isMcq && !_showAnswer) {
+      centerWidget = FilledButton.tonal(
+        onPressed: _toggleAnswer,
+        child: const Text('显示答案'),
+      );
+    } else if (!isMcq && _showAnswer && !hasAnswered) {
+      centerWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () => _handleUserJudgment(false),
+            icon: const Icon(Icons.close, size: 18),
+            label: const Text('答错了'),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: () => _handleUserJudgment(true),
+            icon: const Icon(Icons.check, size: 18),
+            label: const Text('答对了'),
+          ),
+        ],
+      );
+    } else {
+      // For MCQs or answered non-MCQs, just show the progress indicator.
+      centerWidget = Text(
+        '${_currentQuestionIndex + 1}/${_allQuestions.length}',
+        style: TextStyle(
+          color: colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    }
+
     return BottomAppBar(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -331,33 +380,14 @@ class _StudyPageState extends State<StudyPage> {
               tooltip: '上一题',
               onPressed: _currentQuestionIndex > 0 ? _previousQuestion : null,
             ),
-            if (!isMcq && !_showAnswer)
-              FilledButton.tonal(
-                onPressed: _toggleAnswer,
-                child: const Text('显示答案'),
-              ),
-            if (!isMcq && _showAnswer && !hasAnswered)
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _handleUserJudgment(false),
-                    icon: const Icon(Icons.close, size: 18),
-                    label: const Text('答错了'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: () => _handleUserJudgment(true),
-                    icon: const Icon(Icons.check, size: 18),
-                    label: const Text('答对了'),
-                  ),
-                ],
-              ),
-            Text(
-              '${_currentQuestionIndex + 1}/${_allQuestions.length}',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
+            centerWidget,
+            IconButton(
+              icon: const Icon(Icons.arrow_forward),
+              tooltip: '下一题',
+              onPressed: (_currentQuestionIndex < _allQuestions.length - 1 &&
+                      _userAnswers[_currentQuestionIndex] != null)
+                  ? _nextQuestion
+                  : null,
             ),
           ],
         ),
