@@ -109,3 +109,76 @@ class _NotesPageState extends State<NotesPage> {
     );
   }
 }
+
+class _AddNoteDialog extends StatefulWidget {
+  const _AddNoteDialog();
+
+  @override
+  State<_AddNoteDialog> createState() => _AddNoteDialogState();
+}
+
+class _AddNoteDialogState extends State<_AddNoteDialog> {
+  final TextEditingController _titleController = TextEditingController();
+  bool _useAI = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('添加新笔记'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _titleController,
+            decoration: const InputDecoration(
+              labelText: '笔记标题',
+              hintText: '请输入笔记标题',
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Checkbox(
+                value: _useAI,
+                onChanged: (value) {
+                  setState(() {
+                    _useAI = value ?? false;
+                  });
+                },
+              ),
+              const Text('使用AI生成内容'),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_titleController.text.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('请输入笔记标题')),
+              );
+              return;
+            }
+            
+            Navigator.of(context).pop({
+              'title': _titleController.text,
+              'useAI': _useAI,
+            });
+          },
+          child: const Text('确定'),
+        ),
+      ],
+    );
+  }
+}

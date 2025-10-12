@@ -21,6 +21,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   late TabController _tabController;
   late Note _currentNote;
   bool _isEditing = false; // 添加编辑状态标志
+  bool _isGenerating = false; // 添加AI生成状态标志
 
   @override
   void initState() {
@@ -63,6 +64,50 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         Navigator.pop(context, updatedNote);
       }
     });
+  }
+
+  // 新增方法：使用AI填充内容
+  Future<void> _fillContentWithAI() async {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先输入笔记标题')),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _isGenerating = true;
+    });
+
+    try {
+      final aiService = AIService();
+      final result = await aiService.generateContentFromTitle(title);
+      final content = result['content'] as String? ?? 'AI生成内容失败';
+
+      if (mounted) {
+        setState(() {
+          _contentController.text = content;
+          _isGenerating = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AI内容生成成功')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGenerating = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('AI生成内容失败: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _generateQuestions(QuestionType type, int count) async {
@@ -246,6 +291,31 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
+          // 在编辑模式下显示AI填充按钮
+          if (_isEditing) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: _isGenerating
+                  ? ElevatedButton.icon(
+                      onPressed: null,
+                      icon: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      label: const Text('AI生成中...'),
+                    )
+                  : ElevatedButton.icon(
+                      onPressed: _fillContentWithAI,
+                      icon: const Icon(Icons.auto_fix_high),
+                      label: const Text('AI填充内容'),
+                    ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Expanded(
             child: _isEditing
                 ? TextField(

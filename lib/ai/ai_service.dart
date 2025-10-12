@@ -141,4 +141,77 @@ Return ONLY a valid JSON object in this exact format with no additional text:
       throw Exception('生成题目时出错: $e');
       }
   }
+  
+  // 添加根据标题生成内容的方法
+  Future<Map<String, dynamic>> generateContentFromTitle(String title) async {
+    await initialize();
+    
+    final url = Uri.parse('$_baseUrl/chat/completions');
+    
+    final messages = [
+      {
+        'role': 'system',
+        'content': '''
+You are a professional note-taking assistant who specializes in creating detailed and well-structured notes based on a title.
+Return ONLY valid JSON data in the exact format specified, with no additional text.
+Content should be in Markdown format and in Simplified Chinese.
+''',
+      },
+      {
+        'role': 'user',
+        'content': '''
+Based on the title "$title", generate detailed note content.
+
+Requirements for content generation:
+1. Create comprehensive and educational content related to the title
+2. Use Markdown format for better structure (including headers, lists, code blocks if relevant, etc.)
+3. Include multiple sections to organize the content clearly
+4. Add specific details, examples, or explanations where appropriate
+
+Return ONLY a valid JSON object in this exact format with no additional text:
+{
+  "content": "# Title\\n\\nContent in Markdown format..."
+}
+''',
+      },
+    ];
+    
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': messages,
+          'temperature': 0.7,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final content = data['choices'][0]['message']['content'];
+        
+        // 尝试解析返回的JSON
+        try {
+          return jsonDecode(content);
+        } catch (e) {
+          // 如果解析失败，可能是格式问题，尝试提取其中的JSON部分
+          final jsonStart = content.indexOf('{');
+          final jsonEnd = content.lastIndexOf('}') + 1;
+          if (jsonStart != -1 && jsonEnd > jsonStart) {
+            final jsonString = content.substring(jsonStart, jsonEnd);
+            return jsonDecode(jsonString);
+          }
+          rethrow;
+        }
+      } else {
+        throw Exception('API请求失败: ${response.statusCode}, ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('生成内容时出错: $e');
+    }
+  }
 }
