@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'note_service.dart';
-import 'notes/note_new.dart';
+import 'note.dart';
 import 'ai/ai_question.dart';
 import 'stats_service.dart'; // 添加统计服务导入
+import 'srs_service.dart'; // 添加SRS服务导入
+import 'note.dart'; // 添加Note导入
 import 'dart:async';
 
 class StudyPage extends StatefulWidget {
@@ -15,8 +17,10 @@ class StudyPage extends StatefulWidget {
 class _StudyPageState extends State<StudyPage> {
   final NoteService _noteService = NoteService();
   final StatsService _statsService = StatsService(); // 添加统计服务实例
+  final SRSService _srsService = SRSService(); // 添加SRS服务实例
   List<Note> _notes = [];
   List<AIQuestion> _allQuestions = [];
+  List<int> _questionToNoteIndex = []; // 添加问题到笔记索引的映射
   int _currentQuestionIndex = 0;
   bool _showAnswer = false;
   
@@ -75,8 +79,13 @@ class _StudyPageState extends State<StudyPage> {
 
   List<AIQuestion> _extractAllQuestions(List<Note> notes) {
     List<AIQuestion> questions = [];
-    for (var note in notes) {
-      questions.addAll(note.questions);
+    _questionToNoteIndex.clear();
+    
+    for (int noteIndex = 0; noteIndex < notes.length; noteIndex++) {
+      for (int questionIndex = 0; questionIndex < notes[noteIndex].questions.length; questionIndex++) {
+        questions.add(notes[noteIndex].questions[questionIndex]);
+        _questionToNoteIndex.add(noteIndex);
+      }
     }
     return questions;
   }
@@ -122,14 +131,8 @@ class _StudyPageState extends State<StudyPage> {
         // 记录答题结果到统计数据
         _statsService.recordAnswerResult(isCorrect);
         
-        // 自动跳转到下一题
-        if (_currentQuestionIndex < _allQuestions.length - 1) {
-          _currentQuestionIndex++;
-          _showAnswer = false;
-        } else {
-          // 如果是最后一题，显示统计结果
-          _showQuizResults();
-        }
+        // 显示答案和评分按钮
+        _showAnswer = true;
       });
     }
   }
@@ -142,15 +145,36 @@ class _StudyPageState extends State<StudyPage> {
       // 记录答题结果到统计数据
       _statsService.recordAnswerResult(isCorrect);
       
-      // 跳转到下一题
-      if (_currentQuestionIndex < _allQuestions.length - 1) {
+      // 显示答案和评分按钮
+      _showAnswer = true;
+    });
+  }
+  
+  // 处理SRS评分
+  void _handleSRSScore(int quality) async {
+    // 获取当前问题对应的笔记索引
+    int noteIndex = _questionToNoteIndex[_currentQuestionIndex];
+    Note currentNote = _notes[noteIndex];
+    
+    // 使用SRS服务更新笔记
+    Note updatedNote = _srsService.updateNoteSRS(currentNote, quality);
+    
+    // 更新笔记列表
+    _notes[noteIndex] = updatedNote;
+    
+    // 保存更新到存储
+    await _noteService.saveNotes(_notes);
+    
+    // 跳转到下一题
+    if (_currentQuestionIndex < _allQuestions.length - 1) {
+      setState(() {
         _currentQuestionIndex++;
         _showAnswer = false;
-      } else {
-        // 如果是最后一题，显示统计结果
-        _showQuizResults();
-      }
-    });
+      });
+    } else {
+      // 如果是最后一题，显示统计结果
+      _showQuizResults();
+    }
   }
   
   // 显示测验结果
@@ -357,6 +381,10 @@ class _StudyPageState extends State<StudyPage> {
                         if (_showAnswer) ...[
                           const SizedBox(height: 20),
                           _buildAnswerWidget(_allQuestions[_currentQuestionIndex]),
+                          const SizedBox(height: 20),
+                          // 只有在用户已经判断了答案正确与否后才显示SRS评分控件
+                          if (_userAnswers[_currentQuestionIndex] != null)
+                            _buildSRSRatingWidget(),
                         ],
                       ],
                     ),
@@ -378,8 +406,8 @@ class _StudyPageState extends State<StudyPage> {
                   ),
                   child: Column(
                     children: [
-                      // 只有非选择题才显示"显示答案"按钮
-                      if (_allQuestions[_currentQuestionIndex].type != QuestionType.multipleChoice) 
+                      // 只有非选择题才显示"显示答案"按钮，并且在未显示答案时才显示
+                      if (_allQuestions[_currentQuestionIndex].type != QuestionType.multipleChoice && !_showAnswer) 
                         Center(
                           child: FilledButton.tonal(
                             onPressed: _toggleAnswer,
@@ -394,8 +422,8 @@ class _StudyPageState extends State<StudyPage> {
                           ),
                         ),
                       const SizedBox(height: 10),
-                      // 添加用户判断答案正确性的按钮
-                      if (_showAnswer && _allQuestions[_currentQuestionIndex].type != QuestionType.multipleChoice) ...[
+                      // 添加用户判断答案正确性的按钮（仅在显示答案但尚未评分时显示）
+                      if (_showAnswer && _userAnswers[_currentQuestionIndex] == null && _allQuestions[_currentQuestionIndex].type != QuestionType.multipleChoice) ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
@@ -671,5 +699,51 @@ class _StudyPageState extends State<StudyPage> {
           ),
         );
     }
+  }
+  
+  Widget _buildSRSRatingWidget() {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Card(
+      elevation: 0,
+      color: colorScheme.secondaryContainer.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '请评价这个问题的难度:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildSRSRatingButton('再次学习', 0, Colors.red),
+                _buildSRSRatingButton('困难', 1, Colors.orange),
+                _buildSRSRatingButton('良好', 2, Colors.blue),
+                _buildSRSRatingButton('简单', 3, Colors.green),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildSRSRatingButton(String text, int quality, Color color) {
+    return FilledButton.tonal(
+      onPressed: () => _handleSRSScore(quality),
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        backgroundColor: color.withOpacity(0.2),
+        foregroundColor: color,
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 14)),
+    );
   }
 }

@@ -9,6 +9,12 @@ class Note {
   final DateTime updatedAt;
   final List<AIQuestion> questions;
   final String? directory; // 添加目录属性
+  
+  // SRS相关字段
+  final DateTime? nextReviewDate;
+  final double interval;
+  final double difficultyFactor;
+  final int reviewCount;
 
   Note({
     required this.id,
@@ -18,6 +24,10 @@ class Note {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<AIQuestion>? questions,
+    this.nextReviewDate,
+    this.interval = 0.0,
+    this.difficultyFactor = 0.3, // 默认难度因子
+    this.reviewCount = 0,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
         questions = questions ?? [];
@@ -30,6 +40,10 @@ class Note {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<AIQuestion>? questions,
+    DateTime? nextReviewDate,
+    double? interval,
+    double? difficultyFactor,
+    int? reviewCount,
   }) {
     return Note(
       id: id ?? this.id,
@@ -39,6 +53,10 @@ class Note {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       questions: questions ?? this.questions,
+      nextReviewDate: nextReviewDate ?? this.nextReviewDate,
+      interval: interval ?? this.interval,
+      difficultyFactor: difficultyFactor ?? this.difficultyFactor,
+      reviewCount: reviewCount ?? this.reviewCount,
     );
   }
 
@@ -51,6 +69,11 @@ class Note {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'questions': questions.map((q) => q.toJson()).toList(),
+      // SRS相关字段
+      'nextReviewDate': nextReviewDate?.toIso8601String(),
+      'interval': interval,
+      'difficultyFactor': difficultyFactor,
+      'reviewCount': reviewCount,
     };
   }
 
@@ -69,6 +92,13 @@ class Note {
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       questions: questions,
+      // SRS相关字段
+      nextReviewDate: json['nextReviewDate'] != null 
+          ? DateTime.parse(json['nextReviewDate'] as String) 
+          : null,
+      interval: (json['interval'] as num?)?.toDouble() ?? 0.0,
+      difficultyFactor: (json['difficultyFactor'] as num?)?.toDouble() ?? 0.3,
+      reviewCount: json['reviewCount'] as int? ?? 0,
     );
   }
 
@@ -82,7 +112,11 @@ class Note {
         other.directory == directory && // 添加目录比较
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt &&
-        other.questions == questions;
+        other.questions == questions &&
+        other.nextReviewDate == nextReviewDate &&
+        other.interval == interval &&
+        other.difficultyFactor == difficultyFactor &&
+        other.reviewCount == reviewCount;
   }
 
   @override
@@ -93,7 +127,11 @@ class Note {
         directory.hashCode ^ // 添加目录hashCode
         createdAt.hashCode ^
         updatedAt.hashCode ^
-        questions.hashCode;
+        questions.hashCode ^
+        nextReviewDate.hashCode ^
+        interval.hashCode ^
+        difficultyFactor.hashCode ^
+        reviewCount.hashCode;
   }
 }
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'notes/note_new.dart';
+import 'note.dart';
 import 'note_detail_page.dart';
 import 'note_service.dart';
 import 'stats_service.dart'; // 添加统计服务导入

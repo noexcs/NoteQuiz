@@ -1,7 +1,37 @@
 import 'package:flutter/material.dart';
+import 'note_service.dart';
+import 'srs_service.dart';
+import 'note.dart';
 
-class ReviewPage extends StatelessWidget {
+class ReviewPage extends StatefulWidget {
   const ReviewPage({super.key});
+
+  @override
+  State<ReviewPage> createState() => _ReviewPageState();
+}
+
+class _ReviewPageState extends State<ReviewPage> {
+  final NoteService _noteService = NoteService();
+  final SRSService _srsService = SRSService();
+  List<Note> _notes = [];
+  SRSStats? _srsStats;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    await _noteService.init();
+    final notes = await _noteService.loadNotes();
+    final stats = _srsService.getStats(notes);
+    
+    setState(() {
+      _notes = notes;
+      _srsStats = stats;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,28 +71,28 @@ class ReviewPage extends StatelessWidget {
                   _buildReviewCard(
                     context,
                     title: '今日复习',
-                    count: 12,
+                    count: _srsStats?.todayReviewCount ?? 0,
                     color: Colors.blue,
                     icon: Icons.today,
                   ),
                   _buildReviewCard(
                     context,
                     title: '本周复习',
-                    count: 42,
+                    count: _srsStats?.weekReviewCount ?? 0,
                     color: Colors.green,
                     icon: Icons.date_range,
                   ),
                   _buildReviewCard(
                     context,
-                    title: '本月复习',
-                    count: 128,
+                    title: '逾期复习',
+                    count: _srsStats?.overdueCount ?? 0,
                     color: Colors.orange,
-                    icon: Icons.calendar_month,
+                    icon: Icons.warning,
                   ),
                   _buildReviewCard(
                     context,
                     title: '全部复习',
-                    count: 324,
+                    count: _notes.length,
                     color: Colors.purple,
                     icon: Icons.library_books,
                   ),

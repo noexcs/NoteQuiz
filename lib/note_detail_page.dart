@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'notes/note_new.dart';
+import 'note.dart';
 import 'note_service.dart';
 import 'ai/ai_question.dart';
 import 'ai/ai_service.dart';
