@@ -20,6 +20,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   late TextEditingController _contentController;
   late TabController _tabController;
   late Note _currentNote;
+  bool _isEditing = false; // 添加编辑状态标志
 
   @override
   void initState() {
@@ -28,6 +29,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     _contentController = TextEditingController(text: widget.note.content);
     _tabController = TabController(length: 4, vsync: this); // 4 tabs: 笔记详情 + 3种题型
     _currentNote = widget.note;
+    // 如果是新增笔记（假设内容为空表示新增），则默认进入编辑模式
+    _isEditing = widget.note.content.isEmpty;
   }
 
   @override
@@ -36,6 +39,12 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     _contentController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _toggleEdit() {
+    setState(() {
+      _isEditing = !_isEditing;
+    });
   }
 
   void _saveNote() {
@@ -47,6 +56,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     
     widget.noteService.updateNote(updatedNote).then((_) {
       if (mounted) {
+        // 保存后退出编辑模式
+        setState(() {
+          _isEditing = false;
+        });
         Navigator.pop(context, updatedNote);
       }
     });
@@ -190,6 +203,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         title: const Text('笔记详情'),
         actions: [
           IconButton(
+            icon: Icon(_isEditing ? Icons.visibility : Icons.edit),
+            onPressed: _toggleEdit,
+          ),
+          IconButton(
             icon: const Icon(Icons.save),
             onPressed: _saveNote,
           ),
@@ -230,11 +247,22 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: _contentController.text.isNotEmpty
-                ? SingleChildScrollView(
-                    child: MarkdownBody(data: _contentController.text),
+            child: _isEditing
+                ? TextField(
+                    controller: _contentController,
+                    decoration: const InputDecoration(
+                      hintText: '请输入笔记内容...',
+                      border: InputBorder.none,
+                    ),
+                    keyboardType: TextInputType.multiline,
+                    maxLines: null,
+                    expands: true,
                   )
-                : const Text('暂无内容'),
+                : _contentController.text.isNotEmpty
+                    ? SingleChildScrollView(
+                        child: MarkdownBody(data: _contentController.text),
+                      )
+                    : const Center(child: Text('暂无内容')),
           ),
         ],
       ),
