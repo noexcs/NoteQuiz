@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'ai/ai_question.dart';
+import '../ai/ai_question.dart';
 
 class Note {
   final String id;

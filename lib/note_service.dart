@@ -1,5 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'note.dart';
+import 'notes/note_new.dart';
 
 class NoteService {
   static const String _notesKey = 'notes';
