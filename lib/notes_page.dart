@@ -1,0 +1,109 @@
+import 'package:flutter/material.dart';
+import 'note.dart';
+import 'note_detail_page.dart';
+import 'note_service.dart';
+
+class NotesPage extends StatefulWidget {
+  const NotesPage({super.key});
+
+  @override
+  State<NotesPage> createState() => _NotesPageState();
+}
+
+class _NotesPageState extends State<NotesPage> {
+  List<Note> notes = [];
+  final NoteService _noteService = NoteService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    await _noteService.init();
+    final loadedNotes = await _noteService.loadNotes();
+    setState(() {
+      notes = loadedNotes;
+    });
+  }
+
+  Future<void> _addNote() async {
+    final newNote = Note(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: '新笔记',
+      content: '',
+    );
+
+    // 直接导航到编辑页面
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NoteDetailPage(note: newNote, noteService: _noteService),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _noteService.addNote(result);
+      await _loadNotes();
+    }
+  }
+
+  Future<void> _editNote(Note note) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NoteDetailPage(note: note, noteService: _noteService),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _loadNotes();
+    }
+  }
+
+  Future<void> _deleteNote(String id) async {
+    await _noteService.deleteNote(id);
+    await _loadNotes();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('笔记'),
+        backgroundColor: Colors.blue,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _addNote,
+          ),
+        ],
+      ),
+      body: notes.isEmpty
+          ? const Center(
+              child: Text(
+                '暂无笔记，请添加新笔记',
+                style: TextStyle(fontSize: 24),
+              ),
+            )
+          : ListView.builder(
+              itemCount: notes.length,
+              itemBuilder: (context, index) {
+                final note = notes[index];
+                return Card(
+                  margin: const EdgeInsets.all(8.0),
+                  child: ListTile(
+                    title: Text(note.title),
+                    onTap: () => _editNote(note),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () => _deleteNote(note.id),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
