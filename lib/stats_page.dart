@@ -1,7 +1,54 @@
 import 'package:flutter/material.dart';
+import 'stats_service.dart'; // 添加统计服务导入
 
-class StatsPage extends StatelessWidget {
+class StatsPage extends StatefulWidget {
   const StatsPage({super.key});
+
+  @override
+  State<StatsPage> createState() => _StatsPageState();
+}
+
+class _StatsPageState extends State<StatsPage> {
+  final StatsService _statsService = StatsService();
+  StatsData? _statsData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    await _statsService.init();
+    setState(() {
+      _statsData = _statsService.getStats();
+    });
+  }
+
+  // 格式化学习时间显示
+  String _formatStudyTime(int seconds) {
+    final Duration duration = Duration(seconds: seconds);
+    final int hours = duration.inHours;
+    final int minutes = duration.inMinutes.remainder(60);
+    
+    if (hours > 0) {
+      return '$hours 小时 $minutes 分钟';
+    } else if (minutes > 0) {
+      return '$minutes 分钟';
+    } else {
+      return '$seconds 秒';
+    }
+  }
+
+  // 计算正确率
+  String _calculateAccuracy() {
+    if (_statsData == null || _statsData!.totalQuestionsAnswered == 0) {
+      return '0%';
+    }
+    
+    final double accuracy = (_statsData!.totalCorrectAnswers / _statsData!.totalQuestionsAnswered) * 100;
+    return '${accuracy.toStringAsFixed(1)}%';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -10,6 +57,12 @@ class StatsPage extends StatelessWidget {
         title: const Text('统计数据'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadStats,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -42,13 +95,13 @@ class StatsPage extends StatelessWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    _buildStatRow(context, '总学习时长', '24 小时'),
+                    _buildStatRow(context, '总学习时长', _statsData != null ? _formatStudyTime(_statsData!.totalStudyTime) : '--'),
                     const Divider(),
-                    _buildStatRow(context, '已完成题目', '142 题'),
+                    _buildStatRow(context, '已完成题目', _statsData != null ? '${_statsData!.totalQuestionsAnswered} 题' : '--'),
                     const Divider(),
-                    _buildStatRow(context, '正确率', '84%'),
+                    _buildStatRow(context, '正确率', _statsData != null ? _calculateAccuracy() : '--'),
                     const Divider(),
-                    _buildStatRow(context, '笔记数量', '28 篇'),
+                    _buildStatRow(context, '笔记数量', _statsData != null ? '${_statsData!.totalNotes} 篇' : '--'),
                   ],
                 ),
               ),

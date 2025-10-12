@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'note_service.dart';
 import 'notes/note_new.dart';
 import 'ai/ai_question.dart';
+import 'stats_service.dart'; // 添加统计服务导入
+import 'dart:async';
 
 class StudyPage extends StatefulWidget {
   const StudyPage({super.key});
@@ -12,10 +14,16 @@ class StudyPage extends StatefulWidget {
 
 class _StudyPageState extends State<StudyPage> {
   final NoteService _noteService = NoteService();
+  final StatsService _statsService = StatsService(); // 添加统计服务实例
   List<Note> _notes = [];
   List<AIQuestion> _allQuestions = [];
   int _currentQuestionIndex = 0;
   bool _showAnswer = false;
+  
+  // 添加学习计时相关变量
+  DateTime? _startTime;
+  Timer? _studyTimer;
+  int _studySeconds = 0;
   
   // 添加用户答题记录
   List<bool?> _userAnswers = []; // null表示未答题，true表示答对，false表示答错
@@ -25,10 +33,12 @@ class _StudyPageState extends State<StudyPage> {
   void initState() {
     super.initState();
     _loadNotesAndQuestions();
+    _startStudyTimer(); // 开始学习计时
   }
 
   Future<void> _loadNotesAndQuestions() async {
     await _noteService.init();
+    await _statsService.init(); // 初始化统计服务
     final notes = await _noteService.loadNotes();
     setState(() {
       _notes = notes;
@@ -40,6 +50,27 @@ class _StudyPageState extends State<StudyPage> {
       _userAnswers = List.filled(_allQuestions.length, null);
       _selectedOptions = List.filled(_allQuestions.length, null);
     });
+  }
+
+  // 添加开始学习计时方法
+  void _startStudyTimer() {
+    _startTime = DateTime.now();
+    _studyTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_startTime != null) {
+        setState(() {
+          _studySeconds = DateTime.now().difference(_startTime!).inSeconds;
+        });
+      }
+    });
+  }
+
+  // 添加结束学习计时方法
+  Future<void> _stopStudyTimer() async {
+    _studyTimer?.cancel();
+    if (_startTime != null) {
+      final studyDuration = DateTime.now().difference(_startTime!).inSeconds;
+      await _statsService.addStudyTime(studyDuration);
+    }
   }
 
   List<AIQuestion> _extractAllQuestions(List<Note> notes) {
@@ -85,7 +116,11 @@ class _StudyPageState extends State<StudyPage> {
         _selectedOptions[_currentQuestionIndex] = selectedIndex;
         
         // 判断答案是否正确
-        _userAnswers[_currentQuestionIndex] = (selectedIndex == q.correctAnswerIndex);
+        final isCorrect = (selectedIndex == q.correctAnswerIndex);
+        _userAnswers[_currentQuestionIndex] = isCorrect;
+        
+        // 记录答题结果到统计数据
+        _statsService.recordAnswerResult(isCorrect);
         
         // 自动跳转到下一题
         if (_currentQuestionIndex < _allQuestions.length - 1) {
@@ -104,6 +139,9 @@ class _StudyPageState extends State<StudyPage> {
     setState(() {
       _userAnswers[_currentQuestionIndex] = isCorrect;
       
+      // 记录答题结果到统计数据
+      _statsService.recordAnswerResult(isCorrect);
+      
       // 跳转到下一题
       if (_currentQuestionIndex < _allQuestions.length - 1) {
         _currentQuestionIndex++;
@@ -116,7 +154,10 @@ class _StudyPageState extends State<StudyPage> {
   }
   
   // 显示测验结果
-  void _showQuizResults() {
+  void _showQuizResults() async {
+    // 结束学习计时
+    await _stopStudyTimer();
+    
     // 计算正确率
     int correctCount = _userAnswers.where((answer) => answer == true).length;
     double accuracy = _allQuestions.isEmpty ? 0 : correctCount / _allQuestions.length;
@@ -243,6 +284,7 @@ class _StudyPageState extends State<StudyPage> {
                   _showAnswer = false;
                   _userAnswers = List.filled(_allQuestions.length, null);
                   _selectedOptions = List.filled(_allQuestions.length, null);
+                  _startStudyTimer(); // 重新开始计时
                 });
               },
               child: const Text('重新开始'),
@@ -257,6 +299,12 @@ class _StudyPageState extends State<StudyPage> {
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _studyTimer?.cancel();
+    super.dispose();
   }
 
   @override

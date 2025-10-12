@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'notes/note_new.dart';
 import 'note_detail_page.dart';
 import 'note_service.dart';
+import 'stats_service.dart'; // 添加统计服务导入
 
 class NotesPage extends StatefulWidget {
   const NotesPage({super.key});
@@ -13,6 +14,7 @@ class NotesPage extends StatefulWidget {
 class _NotesPageState extends State<NotesPage> {
   List<Note> notes = [];
   final NoteService _noteService = NoteService();
+  final StatsService _statsService = StatsService(); // 添加统计服务实例
 
   @override
   void initState() {
@@ -22,10 +24,14 @@ class _NotesPageState extends State<NotesPage> {
 
   Future<void> _loadNotes() async {
     await _noteService.init();
+    await _statsService.init(); // 初始化统计服务
     final loadedNotes = await _noteService.loadNotes();
     setState(() {
       notes = loadedNotes;
     });
+    
+    // 更新笔记数量统计
+    await _statsService.updateNotesCount(notes.length);
   }
 
   Future<void> _addNote() async {
