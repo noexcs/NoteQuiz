@@ -8,12 +8,11 @@ class ReviewPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('复习'),
-        backgroundColor: Colors.blue,
       ),
       body: const Center(
         child: Text(
           '复习页面',
-          style: TextStyle(fontSize: 24),
+          style: TextStyle(fontSize: 18),
         ),
       ),
     );

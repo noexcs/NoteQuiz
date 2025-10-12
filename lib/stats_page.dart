@@ -8,12 +8,11 @@ class StatsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('统计数据'),
-        backgroundColor: Colors.blue,
       ),
       body: const Center(
         child: Text(
           '统计数据页面',
-          style: TextStyle(fontSize: 24),
+          style: TextStyle(fontSize: 18),
         ),
       ),
     );

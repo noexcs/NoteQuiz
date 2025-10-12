@@ -49,7 +49,6 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('笔记详情'),
-        backgroundColor: Colors.blue,
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -65,7 +64,6 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
               controller: _titleController,
               decoration: const InputDecoration(
                 labelText: '标题',
-                border: OutlineInputBorder(),
               ),
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
@@ -75,8 +73,6 @@ class _NoteDetailPageState extends State<NoteDetailPage> {
                 controller: _contentController,
                 decoration: const InputDecoration(
                   labelText: '内容',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
                 ),
                 maxLines: null,
                 expands: true,

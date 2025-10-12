@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  final Function(String)? onThemeChanged;
+  
+  const SettingsPage({super.key, this.onThemeChanged});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -14,9 +16,11 @@ class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _baseUrlController;
   late TextEditingController _apiKeyController;
   late TextEditingController _modelController;
+  late String _currentTheme;
   
-  static const String _defaultBaseUrl = 'https://api.openai.com/v1';
-  static const String _defaultModel = 'gpt-3.5-turbo';
+  static const String _defaultBaseUrl = 'https://api.deepseek.com';
+  static const String _defaultModel = 'deepseek-chat';
+  static const String _defaultTheme = 'dark';
   
   @override
   void initState() {
@@ -24,6 +28,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _baseUrlController = TextEditingController();
     _apiKeyController = TextEditingController();
     _modelController = TextEditingController();
+    _currentTheme = _defaultTheme;
     _loadSettings();
   }
   
@@ -41,6 +46,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _baseUrlController.text = prefs.getString('api_base_url') ?? _defaultBaseUrl;
       _apiKeyController.text = prefs.getString('api_key') ?? '';
       _modelController.text = prefs.getString('api_model') ?? _defaultModel;
+      _currentTheme = prefs.getString('app_theme') ?? _defaultTheme;
     });
   }
   
@@ -59,12 +65,28 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
   
+  Future<void> _saveTheme(String theme) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_theme', theme);
+    setState(() {
+      _currentTheme = theme;
+    });
+    
+    // 通知主应用更新主题
+    widget.onThemeChanged?.call(theme);
+    
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('主题已保存')),
+      );
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('设置'),
-        backgroundColor: Colors.blue,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -124,13 +146,39 @@ class _SettingsPageState extends State<SettingsPage> {
                 },
               ),
               const SizedBox(height: 24),
+              const Text(
+                '主题设置',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ChoiceChip(
+                    label: const Text('浅色模式'),
+                    selected: _currentTheme == 'light',
+                    onSelected: (selected) {
+                      if (selected) {
+                        _saveTheme('light');
+                      }
+                    },
+                  ),
+                  ChoiceChip(
+                    label: const Text('深色模式'),
+                    selected: _currentTheme == 'dark',
+                    onSelected: (selected) {
+                      if (selected) {
+                        _saveTheme('dark');
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               Center(
                 child: ElevatedButton(
                   onPressed: _saveSettings,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                  ),
-                  child: const Text('保存设置', style: TextStyle(fontSize: 16)),
+                  child: const Text('保存设置'),
                 ),
               ),
             ],

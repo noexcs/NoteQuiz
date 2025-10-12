@@ -72,7 +72,6 @@ class _NotesPageState extends State<NotesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('笔记'),
-        backgroundColor: Colors.blue,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -84,22 +83,19 @@ class _NotesPageState extends State<NotesPage> {
           ? const Center(
               child: Text(
                 '暂无笔记，请添加新笔记',
-                style: TextStyle(fontSize: 24),
+                style: TextStyle(fontSize: 18),
               ),
             )
           : ListView.builder(
               itemCount: notes.length,
               itemBuilder: (context, index) {
                 final note = notes[index];
-                return Card(
-                  margin: const EdgeInsets.all(8.0),
-                  child: ListTile(
-                    title: Text(note.title),
-                    onTap: () => _editNote(note),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () => _deleteNote(note.id),
-                    ),
+                return ListTile(
+                  title: Text(note.title),
+                  onTap: () => _editNote(note),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () => _deleteNote(note.id),
                   ),
                 );
               },
