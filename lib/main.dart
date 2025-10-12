@@ -67,6 +67,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _themeMode = 'dark';
+  MaterialColor _primarySwatch = Colors.blue;
 
   @override
   void initState() {
@@ -78,12 +79,32 @@ class _MyAppState extends State<MyApp> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _themeMode = prefs.getString('app_theme') ?? 'dark';
+      
+      // 加载自定义主题色
+      final primarySwatchValue = prefs.getInt('primary_swatch') ?? Colors.blue.value;
+      _primarySwatch = MaterialColor(primarySwatchValue, _buildColorSwatch(primarySwatchValue));
     });
   }
 
-  void _updateTheme(String theme) {
+  // 构建颜色色阶
+  Map<int, Color> _buildColorSwatch(int color) {
+    final colors = <int, Color>{};
+    final baseColor = Color(color);
+    
+    for (int i = 50; i <= 900; i += 100) {
+      colors[i] = baseColor.withOpacity(1 - (i / 1000));
+    }
+    colors[500] = baseColor; // 主色
+    
+    return colors;
+  }
+
+  void _updateTheme(String theme, [MaterialColor? primarySwatch]) {
     setState(() {
       _themeMode = theme;
+      if (primarySwatch != null) {
+        _primarySwatch = primarySwatch;
+      }
     });
   }
 
@@ -94,20 +115,27 @@ class _MyAppState extends State<MyApp> {
       title: 'Flutter Demo',
       theme: _themeMode == 'light' 
         ? ThemeData(
-            brightness: Brightness.light,
-            primarySwatch: Colors.blue,
-            useMaterial3: true, // 启用 Material Design 3
+            useMaterial3: true,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: _primarySwatch,
+              brightness: Brightness.light,
+            ),
           )
         : ThemeData(
-            brightness: Brightness.dark, // 使用暗色主题，让白色文字更清晰
-            primarySwatch: Colors.blue,
-            useMaterial3: true, // 启用 Material Design 3
+            useMaterial3: true,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: _primarySwatch,
+              brightness: Brightness.dark,
+            ),
           ),
       home: const WelcomePage(),
       routes: {
         '/study': (context) => const StudyPage(),
         '/review': (context) => const ReviewPage(),
-        '/settings': (context) => SettingsPage(onThemeChanged: _updateTheme),
+        '/settings': (context) => SettingsPage(
+            onThemeChanged: _updateTheme,
+            currentSwatch: _primarySwatch,
+          ),
         '/notes': (context) => const NotesPage(),
         '/stats': (context) => const StatsPage(),
       },
