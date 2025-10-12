@@ -19,6 +19,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   late TabController _tabController;
+  late Note _currentNote;
 
   @override
   void initState() {
@@ -26,6 +27,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     _titleController = TextEditingController(text: widget.note.title);
     _contentController = TextEditingController(text: widget.note.content);
     _tabController = TabController(length: 4, vsync: this); // 4 tabs: 笔记详情 + 3种题型
+    _currentNote = widget.note;
   }
 
   @override
@@ -37,7 +39,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   }
 
   void _saveNote() {
-    final updatedNote = widget.note.copyWith(
+    final updatedNote = _currentNote.copyWith(
       title: _titleController.text,
       content: _contentController.text,
       updatedAt: DateTime.now(),
@@ -51,7 +53,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   }
 
   Future<void> _generateQuestions(QuestionType type, int count) async {
-    if (widget.note.content.isEmpty) {
+    if (_currentNote.content.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('笔记内容为空，无法生成题目')),
@@ -82,7 +84,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
 
       final aiService = AIService();
       final result = await aiService.generateQuestions(
-        content: widget.note.content,
+        content: _currentNote.content,
         questionType: questionTypeText,
         count: count,
       );
@@ -115,16 +117,15 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
       }
 
       // 更新笔记
-      final updatedQuestions = List<AIQuestion>.from(widget.note.questions);
+      final updatedQuestions = List<AIQuestion>.from(_currentNote.questions);
       updatedQuestions.addAll(newQuestions);
 
-      final updatedNote = widget.note.copyWith(questions: updatedQuestions);
+      final updatedNote = _currentNote.copyWith(questions: updatedQuestions);
       await widget.noteService.updateNote(updatedNote);
 
       if (mounted) {
-        // 直接更新当前页面，不进行跳转
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          Navigator.pop(context, updatedNote);
+        setState(() {
+          _currentNote = updatedNote;
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -195,11 +196,11 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: '笔记详情'),
-            Tab(text: '选择题'),
-            Tab(text: '填空题'),
-            Tab(text: '简答题'),
+          tabs: [
+            const Tab(text: '笔记详情'),
+            Tab(text: '选择题(${_currentNote.questions.where((q) => q.type == QuestionType.multipleChoice).length})'),
+            Tab(text: '填空题(${_currentNote.questions.where((q) => q.type == QuestionType.fillInBlank).length})'),
+            Tab(text: '简答题(${_currentNote.questions.where((q) => q.type == QuestionType.shortAnswer).length})'),
           ],
         ),
       ),
@@ -241,7 +242,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   }
 
   Widget _buildMultipleChoiceQuestionsTab() {
-    final multipleChoiceQuestions = widget.note.questions
+    final multipleChoiceQuestions = _currentNote.questions
         .where((q) => q.type == QuestionType.multipleChoice)
         .toList();
 
@@ -252,14 +253,25 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '选择题',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                '选择题(${multipleChoiceQuestions.length})',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              ElevatedButton.icon(
-                onPressed: () => _showGenerateQuestionsDialog(QuestionType.multipleChoice),
-                icon: const Icon(Icons.auto_fix_high),
-                label: const Text('AI生成'),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _showGenerateQuestionsDialog(QuestionType.multipleChoice),
+                    icon: const Icon(Icons.auto_fix_high),
+                    label: const Text('AI生成'),
+                  ),
+                  const SizedBox(width: 8),
+                  if (multipleChoiceQuestions.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete_forever),
+                      color: Colors.red,
+                      onPressed: () => _confirmDeleteAllQuestions(QuestionType.multipleChoice),
+                    ),
+                ],
               ),
             ],
           ),
@@ -284,9 +296,19 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          question.question,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                question.question,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.multipleChoice),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         ...List.generate(question.options.length, (i) {
@@ -322,7 +344,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   }
 
   Widget _buildFillInBlankQuestionsTab() {
-    final fillInBlankQuestions = widget.note.questions
+    final fillInBlankQuestions = _currentNote.questions
         .where((q) => q.type == QuestionType.fillInBlank)
         .toList();
 
@@ -333,14 +355,25 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '填空题',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                '填空题(${fillInBlankQuestions.length})',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              ElevatedButton.icon(
-                onPressed: () => _showGenerateQuestionsDialog(QuestionType.fillInBlank),
-                icon: const Icon(Icons.auto_fix_high),
-                label: const Text('AI生成'),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _showGenerateQuestionsDialog(QuestionType.fillInBlank),
+                    icon: const Icon(Icons.auto_fix_high),
+                    label: const Text('AI生成'),
+                  ),
+                  const SizedBox(width: 8),
+                  if (fillInBlankQuestions.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete_forever),
+                      color: Colors.red,
+                      onPressed: () => _confirmDeleteAllQuestions(QuestionType.fillInBlank),
+                    ),
+                ],
               ),
             ],
           ),
@@ -365,9 +398,19 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          question.question,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                question.question,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.fillInBlank),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Wrap(
@@ -400,7 +443,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   }
 
   Widget _buildShortAnswerQuestionsTab() {
-    final shortAnswerQuestions = widget.note.questions
+    final shortAnswerQuestions = _currentNote.questions
         .where((q) => q.type == QuestionType.shortAnswer)
         .toList();
 
@@ -411,14 +454,25 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '简答题',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                '简答题(${shortAnswerQuestions.length})',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              ElevatedButton.icon(
-                onPressed: () => _showGenerateQuestionsDialog(QuestionType.shortAnswer),
-                icon: const Icon(Icons.auto_fix_high),
-                label: const Text('AI生成'),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _showGenerateQuestionsDialog(QuestionType.shortAnswer),
+                    icon: const Icon(Icons.auto_fix_high),
+                    label: const Text('AI生成'),
+                  ),
+                  const SizedBox(width: 8),
+                  if (shortAnswerQuestions.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete_forever),
+                      color: Colors.red,
+                      onPressed: () => _confirmDeleteAllQuestions(QuestionType.shortAnswer),
+                    ),
+                ],
               ),
             ],
           ),
@@ -443,9 +497,19 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          question.question,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                question.question,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.shortAnswer),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         const Text('可接受的答案:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -472,5 +536,155 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           ),
       ],
     );
+  }
+
+  Future<void> _confirmDeleteQuestion(int index, QuestionType type) async {
+    final String typeName;
+    switch (type) {
+      case QuestionType.multipleChoice:
+        typeName = '选择题';
+        break;
+      case QuestionType.fillInBlank:
+        typeName = '填空题';
+        break;
+      case QuestionType.shortAnswer:
+        typeName = '简答题';
+        break;
+    }
+
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('确认删除'),
+          content: Text('确定要删除这道$typeName吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteQuestion(index, type);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteAllQuestions(QuestionType type) async {
+    final String typeName;
+    switch (type) {
+      case QuestionType.multipleChoice:
+        typeName = '选择题';
+        break;
+      case QuestionType.fillInBlank:
+        typeName = '填空题';
+        break;
+      case QuestionType.shortAnswer:
+        typeName = '简答题';
+        break;
+    }
+
+    int count = 0;
+    switch (type) {
+      case QuestionType.multipleChoice:
+        count = widget.note.questions.where((q) => q.type == QuestionType.multipleChoice).length;
+        break;
+      case QuestionType.fillInBlank:
+        count = widget.note.questions.where((q) => q.type == QuestionType.fillInBlank).length;
+        break;
+      case QuestionType.shortAnswer:
+        count = widget.note.questions.where((q) => q.type == QuestionType.shortAnswer).length;
+        break;
+    }
+
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('确认删除'),
+          content: Text('确定要删除所有$count道$typeName吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteAllQuestions(type);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('全部删除'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteQuestion(int index, QuestionType type) {
+    final updatedQuestions = List<AIQuestion>.from(_currentNote.questions);
+    
+    // 找到正确的索引（因为列表是过滤后的）
+    int actualIndex = 0;
+    int filteredIndex = 0;
+    for (var i = 0; i < updatedQuestions.length; i++) {
+      if (updatedQuestions[i].type == type) {
+        if (filteredIndex == index) {
+          actualIndex = i;
+          break;
+        }
+        filteredIndex++;
+      }
+    }
+    
+    updatedQuestions.removeAt(actualIndex);
+    final updatedNote = _currentNote.copyWith(questions: updatedQuestions);
+    widget.noteService.updateNote(updatedNote).then((_) {
+      if (mounted) {
+        setState(() {
+          _currentNote = updatedNote;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('题目删除成功')),
+        );
+      }
+    });
+  }
+
+  void _deleteAllQuestions(QuestionType type) {
+    final String typeName;
+    switch (type) {
+      case QuestionType.multipleChoice:
+        typeName = '选择题';
+        break;
+      case QuestionType.fillInBlank:
+        typeName = '填空题';
+        break;
+      case QuestionType.shortAnswer:
+        typeName = '简答题';
+        break;
+    }
+
+    final updatedQuestions = List<AIQuestion>.from(_currentNote.questions);
+    updatedQuestions.removeWhere((q) => q.type == type);
+    final updatedNote = _currentNote.copyWith(questions: updatedQuestions);
+    widget.noteService.updateNote(updatedNote).then((_) {
+      if (mounted) {
+        setState(() {
+          _currentNote = updatedNote;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('所有$typeName已删除')),
+        );
+      }
+    });
   }
 }
