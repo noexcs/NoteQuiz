@@ -22,6 +22,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   late Note _currentNote;
   bool _isEditing = false; // 添加编辑状态标志
   bool _isGenerating = false; // 添加AI生成状态标志
+  bool _isGeneratingQuestions = false; // 添加AI生成题目状态标志
   String _initialTitle = ''; // 记录初始标题
   String _initialContent = ''; // 记录初始内容
   FocusNode? _titleFocusNode; // 标题输入框焦点节点
@@ -229,13 +230,14 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         break;
     }
 
-    try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('正在生成$count道$questionTypeText...')),
-        );
-      }
+    // 设置正在生成题目的状态
+    if (mounted) {
+      setState(() {
+        _isGeneratingQuestions = true;
+      });
+    }
 
+    try {
       final aiService = AIService();
       final result = await aiService.generateQuestions(
         content: _currentNote.content,
@@ -280,6 +282,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
       if (mounted) {
         setState(() {
           _currentNote = updatedNote;
+          _isGeneratingQuestions = false; // 重置生成状态
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -288,6 +291,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _isGeneratingQuestions = false; // 重置生成状态
+        });
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('生成题目失败: $e')),
         );
@@ -455,9 +462,20 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () => _showGenerateQuestionsDialog(QuestionType.multipleChoice),
-                    icon: const Icon(Icons.auto_fix_high),
-                    label: const Text('AI生成'),
+                    onPressed: _isGeneratingQuestions 
+                        ? null 
+                        : () => _showGenerateQuestionsDialog(QuestionType.multipleChoice),
+                    icon: _isGeneratingQuestions
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.auto_fix_high),
+                    label: Text(_isGeneratingQuestions ? '正在生成' : 'AI生成'),
                   ),
                   const SizedBox(width: 8),
                   if (multipleChoiceQuestions.isNotEmpty)
@@ -557,9 +575,20 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () => _showGenerateQuestionsDialog(QuestionType.fillInBlank),
-                    icon: const Icon(Icons.auto_fix_high),
-                    label: const Text('AI生成'),
+                    onPressed: _isGeneratingQuestions 
+                        ? null 
+                        : () => _showGenerateQuestionsDialog(QuestionType.fillInBlank),
+                    icon: _isGeneratingQuestions
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.auto_fix_high),
+                    label: Text(_isGeneratingQuestions ? '正在生成' : 'AI生成'),
                   ),
                   const SizedBox(width: 8),
                   if (fillInBlankQuestions.isNotEmpty)
@@ -656,9 +685,20 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () => _showGenerateQuestionsDialog(QuestionType.shortAnswer),
-                    icon: const Icon(Icons.auto_fix_high),
-                    label: const Text('AI生成'),
+                    onPressed: _isGeneratingQuestions 
+                        ? null 
+                        : () => _showGenerateQuestionsDialog(QuestionType.shortAnswer),
+                    icon: _isGeneratingQuestions
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.auto_fix_high),
+                    label: Text(_isGeneratingQuestions ? '正在生成' : 'AI生成'),
                   ),
                   const SizedBox(width: 8),
                   if (shortAnswerQuestions.isNotEmpty)
