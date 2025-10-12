@@ -373,6 +373,20 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
             _buildShortAnswerQuestionsTab(),
           ],
         ),
+        floatingActionButton: _isEditing ? FloatingActionButton.extended(
+          onPressed: _isGenerating ? null : _fillContentWithAIStream,
+          icon: _isGenerating 
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Icon(Icons.auto_fix_high),
+          label: Text(_isGenerating ? '正在AI填充' : 'AI填充内容'),
+        ) : null,
       ),
     );
   }
@@ -382,42 +396,23 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          TextField(
-            controller: _titleController,
-            decoration: const InputDecoration(
-              labelText: '标题',
-              hintText: '请输入笔记标题', // 添加placeholder提示
+          if (_isEditing)
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: '标题',
+                hintText: '请输入笔记标题', // 添加placeholder提示
+              ),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              // 使用专门创建的FocusNode
+              focusNode: _titleFocusNode,
+            )
+          else
+            Text(
+              _titleController.text,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            // 使用专门创建的FocusNode
-            focusNode: _titleFocusNode,
-          ),
           const SizedBox(height: 16),
-          // 在编辑模式下显示AI填充按钮
-          if (_isEditing) ...[
-            Align(
-              alignment: Alignment.centerRight,
-              child: _isGenerating
-                  ? ElevatedButton.icon(
-                      onPressed: null,
-                      icon: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                      label: const Text('AI生成中...'),
-                    )
-                  : ElevatedButton.icon(
-                      onPressed: _fillContentWithAIStream, // 使用流式版本
-                      icon: const Icon(Icons.auto_fix_high),
-                      label: const Text('AI填充内容'),
-                    ),
-            ),
-            const SizedBox(height: 8),
-          ],
           Expanded(
             child: _isEditing
                 ? TextField(
