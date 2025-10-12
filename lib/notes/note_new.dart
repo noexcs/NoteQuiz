@@ -8,11 +8,13 @@ class Note {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<AIQuestion> questions;
+  final String? directory; // 添加目录属性
 
   Note({
     required this.id,
     required this.title,
     required this.content,
+    this.directory, // 添加目录参数
     DateTime? createdAt,
     DateTime? updatedAt,
     List<AIQuestion>? questions,
@@ -24,6 +26,7 @@ class Note {
     String? id,
     String? title,
     String? content,
+    String? directory, // 添加目录参数
     DateTime? createdAt,
     DateTime? updatedAt,
     List<AIQuestion>? questions,
@@ -32,6 +35,7 @@ class Note {
       id: id ?? this.id,
       title: title ?? this.title,
       content: content ?? this.content,
+      directory: directory ?? this.directory, // 添加目录参数
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       questions: questions ?? this.questions,
@@ -43,6 +47,7 @@ class Note {
       'id': id,
       'title': title,
       'content': content,
+      'directory': directory, // 添加目录到JSON
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'questions': questions.map((q) => q.toJson()).toList(),
@@ -60,6 +65,7 @@ class Note {
       id: json['id'] as String,
       title: json['title'] as String,
       content: json['content'] as String,
+      directory: json['directory'] as String?, // 从JSON读取目录
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       questions: questions,
@@ -73,6 +79,7 @@ class Note {
         other.id == id &&
         other.title == title &&
         other.content == content &&
+        other.directory == directory && // 添加目录比较
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt &&
         other.questions == questions;
@@ -83,6 +90,7 @@ class Note {
     return id.hashCode ^
         title.hashCode ^
         content.hashCode ^
+        directory.hashCode ^ // 添加目录hashCode
         createdAt.hashCode ^
         updatedAt.hashCode ^
         questions.hashCode;
