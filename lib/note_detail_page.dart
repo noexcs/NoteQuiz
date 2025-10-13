@@ -242,7 +242,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     }
   }
 
-  Future<void> _generateQuestions(QuestionType type, int count) async {
+  Future<void> _generateQuestions(QuestionType type, int count, {String? customInstructions}) async {
     if (_currentNote.content.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -294,6 +294,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         questionType: questionTypeText,
         count: count,
         existingQuestions: existingQuestions,
+        customInstructions: customInstructions, // 添加这一行来传递自定义指令
       );
 
       final List<AIQuestion> newQuestions = [];
@@ -358,6 +359,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
 
   Future<void> _showGenerateQuestionsDialog(QuestionType type) async {
     final TextEditingController countController = TextEditingController(text: '5');
+    final TextEditingController instructionsController = TextEditingController();
     
     return showDialog(
       context: context,
@@ -377,6 +379,17 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 16),
+              const Text('请输入额外的生成指令（可选）:'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: instructionsController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: '例如：请生成一些较难的题目，或专注于某个特定方面',
+                  border: OutlineInputBorder(),
+                ),
+              ),
             ],
           ),
           actions: [
@@ -387,8 +400,13 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
             ElevatedButton(
               onPressed: () {
                 final count = int.tryParse(countController.text) ?? 5;
+                final instructions = instructionsController.text.trim();
                 Navigator.of(context).pop();
-                _generateQuestions(type, count);
+                _generateQuestions(
+                  type, 
+                  count, 
+                  customInstructions: instructions.isEmpty ? null : instructions
+                );
               },
               child: const Text('生成'),
             ),

@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 class AIService {
-
   static const String _defaultBaseUrl = 'https://api.deepseek.com';
   static const String _defaultModel = 'deepseek-chat';
 
@@ -25,7 +25,6 @@ Return ONLY valid JSON data in the exact format specified, with no additional te
 Questions should be in Simplified Chinese.
 ''';
   static const String _questionRequirementsPrompt = '''
-Requirements for question generation:
 1. Multiple Choice: Include question, options list, correct answer index (0-based), and explanation
 2. Fill in the Blank: Include question with blank (______), correct answers list, hint, and explanation
 3. Short Answer: Include question, acceptable answers list, and explanation
@@ -70,7 +69,6 @@ Return ONLY valid JSON data in the exact format specified, with no additional te
 Questions should be in Simplified Chinese.
 ''';
   static const String _multipleChoiceRequirementsPrompt = '''
-Requirements for question generation:
 Include question, options list, correct answer index (0-based), and explanation
 
 Return ONLY a valid JSON object in this exact format with no additional text:
@@ -95,7 +93,6 @@ Return ONLY valid JSON data in the exact format specified, with no additional te
 Questions should be in Simplified Chinese.
 ''';
   static const String _fillInBlankRequirementsPrompt = '''
-Requirements for question generation:
 Include question with blank (______), correct answers list, hint, and explanation
 
 Return ONLY a valid JSON object in this exact format with no additional text:
@@ -120,7 +117,6 @@ Return ONLY valid JSON data in the exact format specified, with no additional te
 Questions should be in Simplified Chinese.
 ''';
   static const String _shortAnswerRequirementsPrompt = '''
-Requirements for question generation:
 Include question, acceptable answers list, and explanation
 
 Return ONLY a valid JSON object in this exact format with no additional text:
@@ -184,6 +180,7 @@ Return ONLY a valid JSON object in this exact format with no additional text:
     required String questionType,
     required int count,
     List<Map<String, dynamic>>? existingQuestions,
+    String? customInstructions,
   }) async {
     await initialize();
     final url = Uri.parse('$_baseUrl/chat/completions');
@@ -212,8 +209,21 @@ Return ONLY a valid JSON object in this exact format with no additional text:
     String existingQuestionsText = '';
     if (existingQuestions != null && existingQuestions.isNotEmpty) {
       final existingQuestionsJson = jsonEncode(existingQuestions);
-      existingQuestionsText = '\n\nExisting questions (DO NOT generate duplicates of these questions):\n$existingQuestionsJson\n\nEnsure all generated questions are UNIQUE and not similar to the existing ones.';
+      existingQuestionsText =
+          '\n\nExisting questions (DO NOT generate duplicates of these questions):\n$existingQuestionsJson\n\nEnsure all generated questions are UNIQUE and not similar to the existing ones.';
     }
+
+    String customInstructionsText =
+'''
+Additional instructions:
+$_questionUserPrompt
+${customInstructions ?? ''}
+
+Please follow these instructions when generating questions.
+''';
+
+    print(customInstructionsText);
+    print(customInstructions);
 
     final messages = [
       {'role': 'system', 'content': systemPrompt},
@@ -221,16 +231,17 @@ Return ONLY a valid JSON object in this exact format with no additional text:
         'role': 'user',
         'content':
             '''
-Based on the following text content, generate $count $questionType questions:
+Based on the following text content, generate $count $questionType questions.
+$customInstructionsText
 
+Content: 
 $content
 
-
+Requirements for question generation:
 $requirementsPrompt
 
 $existingQuestionsText
 
-$_questionUserPrompt
 ''',
       },
     ];
@@ -353,6 +364,17 @@ $_contentUserPrompt
       }
     } else {
       throw Exception('API请求失败: ${response.statusCode}, ${response.body}');
+    }
+  }
+
+  // Helper method to print long strings
+  void _printLongString(String str) {
+    const int chunkSize = 1000;
+    for (int i = 0; i < str.length; i += chunkSize) {
+      int end = (i + chunkSize < str.length) ? i + chunkSize : str.length;
+      debugPrint(
+        '[${(i / chunkSize).round() + 1}/${(str.length / chunkSize).ceil()}] ${str.substring(i, end)}',
+      );
     }
   }
 }
