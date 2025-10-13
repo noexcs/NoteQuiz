@@ -3,17 +3,28 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AIService {
-  // --- Defaults ---
+
   static const String _defaultBaseUrl = 'https://api.deepseek.com';
   static const String _defaultModel = 'deepseek-chat';
+
+  static const String _defaultContentSystemPrompt = '''
+You are a professional note-taking assistant who specializes in creating detailed and well-structured notes based on a title.
+Content should be in Markdown format and in Simplified Chinese.
+''';
+  static const String _contentRequirementsPrompt = '''
+Requirements for content generation:
+1. Create comprehensive and educational content related to the title
+2. Use Markdown format for better structure (including headers, lists, code blocks if relevant, etc.)
+3. Include multiple sections to organize the content clearly
+4. Add specific details, examples, or explanations where appropriate
+''';
 
   static const String _defaultQuestionSystemPrompt = '''
 You are a professional education assistant who specializes in generating questions based on text content. 
 Return ONLY valid JSON data in the exact format specified, with no additional text.
 Questions should be in Simplified Chinese.
 ''';
-
-  static const String _defaultQuestionRequirementsPrompt = '''
+  static const String _questionRequirementsPrompt = '''
 Requirements for question generation:
 1. Multiple Choice: Include question, options list, correct answer index (0-based), and explanation
 2. Fill in the Blank: Include question with blank (______), correct answers list, hint, and explanation
@@ -53,13 +64,12 @@ Return ONLY a valid JSON object in this exact format with no additional text:
 
 ''';
 
-  static const String _defaultMultipleChoiceSystemPrompt = '''
+  static const String _multipleChoiceSystemPrompt = '''
 You are a professional education assistant who specializes in generating multiple choice questions based on text content. 
 Return ONLY valid JSON data in the exact format specified, with no additional text.
 Questions should be in Simplified Chinese.
 ''';
-
-  static const String _defaultMultipleChoiceRequirementsPrompt = '''
+  static const String _multipleChoiceRequirementsPrompt = '''
 Requirements for question generation:
 Include question, options list, correct answer index (0-based), and explanation
 
@@ -79,13 +89,12 @@ Return ONLY a valid JSON object in this exact format with no additional text:
 }
 ''';
 
-  static const String _defaultFillInBlankSystemPrompt = '''
+  static const String _fillInBlankSystemPrompt = '''
 You are a professional education assistant who specializes in generating fill-in-the-blank questions based on text content. 
 Return ONLY valid JSON data in the exact format specified, with no additional text.
 Questions should be in Simplified Chinese.
 ''';
-
-  static const String _defaultFillInBlankRequirementsPrompt = '''
+  static const String _fillInBlankRequirementsPrompt = '''
 Requirements for question generation:
 Include question with blank (______), correct answers list, hint, and explanation
 
@@ -105,13 +114,12 @@ Return ONLY a valid JSON object in this exact format with no additional text:
 }
 ''';
 
-  static const String _defaultShortAnswerSystemPrompt = '''
+  static const String _shortAnswerSystemPrompt = '''
 You are a professional education assistant who specializes in generating short answer questions based on text content. 
 Return ONLY valid JSON data in the exact format specified, with no additional text.
 Questions should be in Simplified Chinese.
 ''';
-
-  static const String _defaultShortAnswerRequirementsPrompt = '''
+  static const String _shortAnswerRequirementsPrompt = '''
 Requirements for question generation:
 Include question, acceptable answers list, and explanation
 
@@ -130,25 +138,13 @@ Return ONLY a valid JSON object in this exact format with no additional text:
 }
 ''';
 
-  static const String _defaultContentSystemPrompt = '''
-You are a professional note-taking assistant who specializes in creating detailed and well-structured notes based on a title.
-Return ONLY valid JSON data in the exact format specified, with no additional text.
-Content should be in Markdown format and in Simplified Chinese.
-''';
-
-  static const String _defaultStreamContentSystemPrompt = '''
-You are a professional note-taking assistant who specializes in creating detailed and well-structured notes based on a title.
-Content should be in Markdown format and in Simplified Chinese.
-''';
-
   // --- Configuration ---
   String _baseUrl = _defaultBaseUrl;
   String _apiKey = '';
   String _model = _defaultModel;
 
   // --- Custom Prompts ---
-  String _questionSystemPrompt =
-      _defaultMultipleChoiceSystemPrompt; // Default to multiple choice
+  String _questionSystemPrompt = _defaultQuestionSystemPrompt;
   String _questionUserPrompt = '';
   String _contentSystemPrompt = _defaultContentSystemPrompt;
   String _contentUserPrompt = '';
@@ -171,7 +167,7 @@ Content should be in Markdown format and in Simplified Chinese.
     _questionSystemPrompt =
         prefs.getString('question_system_prompt')?.trim().isNotEmpty ?? false
         ? prefs.getString('question_system_prompt')!
-        : _defaultMultipleChoiceSystemPrompt; // Use default multiple choice prompt as fallback
+        : _defaultQuestionSystemPrompt;
     _questionUserPrompt = prefs.getString('question_user_prompt') ?? '';
 
     _contentSystemPrompt =
@@ -196,20 +192,20 @@ Content should be in Markdown format and in Simplified Chinese.
     String requirementsPrompt;
     switch (questionType.toLowerCase()) {
       case '选择题':
-        systemPrompt = _defaultMultipleChoiceSystemPrompt;
-        requirementsPrompt = _defaultMultipleChoiceRequirementsPrompt;
+        systemPrompt = _multipleChoiceSystemPrompt;
+        requirementsPrompt = _multipleChoiceRequirementsPrompt;
         break;
       case '填空题':
-        systemPrompt = _defaultFillInBlankSystemPrompt;
-        requirementsPrompt = _defaultFillInBlankRequirementsPrompt;
+        systemPrompt = _fillInBlankSystemPrompt;
+        requirementsPrompt = _fillInBlankRequirementsPrompt;
         break;
       case '问答题':
-        systemPrompt = _defaultShortAnswerSystemPrompt;
-        requirementsPrompt = _defaultShortAnswerRequirementsPrompt;
+        systemPrompt = _shortAnswerSystemPrompt;
+        requirementsPrompt = _shortAnswerRequirementsPrompt;
         break;
       default:
-        systemPrompt = _defaultQuestionSystemPrompt;
-        requirementsPrompt = _defaultQuestionRequirementsPrompt;
+        systemPrompt = _questionSystemPrompt;
+        requirementsPrompt = _questionRequirementsPrompt;
     }
 
     final messages = [
@@ -248,10 +244,11 @@ $_questionUserPrompt
     }
   }
 
-  Future<Map<String, dynamic>> generateContentFromTitle(String title) async {
+  Stream<String> streamContentFromTitle(String title) async* {
     await initialize();
     final url = Uri.parse('$_baseUrl/chat/completions');
     final messages = [
+      // Use a dedicated system prompt for streaming that does NOT ask for JSON.
       {'role': 'system', 'content': _contentSystemPrompt},
       {
         'role': 'user',
@@ -259,56 +256,7 @@ $_questionUserPrompt
             '''
 Based on the title "$title", generate detailed note content.
 
-Requirements for content generation:
-1. Create comprehensive and educational content related to the title
-2. Use Markdown format for better structure (including headers, lists, code blocks if relevant, etc.)
-3. Include multiple sections to organize the content clearly
-4. Add specific details, examples, or explanations where appropriate
-
-Return ONLY a valid JSON object in this exact format with no additional text:
-{
-  "content": "# Title\\n\\nContent in Markdown format..."
-}
-
-$_contentUserPrompt
-''',
-      },
-    ];
-
-    try {
-      final response = await http.post(
-        url,
-        headers: _buildHeaders(),
-        body: jsonEncode({
-          'model': _model,
-          'messages': messages,
-          'temperature': 0.7,
-          'response_format': {'type': 'json_object'},
-        }),
-      );
-      return _processResponse(response);
-    } catch (e) {
-      throw Exception('生成内容时出错: $e');
-    }
-  }
-
-  Stream<String> streamContentFromTitle(String title) async* {
-    await initialize();
-    final url = Uri.parse('$_baseUrl/chat/completions');
-    final messages = [
-      // Use a dedicated system prompt for streaming that does NOT ask for JSON.
-      {'role': 'system', 'content': _defaultStreamContentSystemPrompt},
-      {
-        'role': 'user',
-        'content':
-            '''
-Based on the title "$title", generate detailed note content.
-
-Requirements for content generation:
-1. Create comprehensive and educational content related to the title
-2. Use Markdown format for better structure (including headers, lists, code blocks if relevant, etc.)
-3. Include multiple sections to organize the content clearly
-4. Add specific details, examples, or explanations where appropriate
+$_contentRequirementsPrompt
 
 $_contentUserPrompt
 ''',
