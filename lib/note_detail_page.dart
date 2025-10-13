@@ -4,6 +4,7 @@ import 'note_service.dart';
 import 'ai/ai_question.dart';
 import 'ai/ai_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'question_note_service.dart';
 
 class NoteDetailPage extends StatefulWidget {
   final Note note;
@@ -26,6 +27,13 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
   String _initialTitle = ''; // 记录初始标题
   String _initialContent = ''; // 记录初始内容
   FocusNode? _titleFocusNode; // 标题输入框焦点节点
+
+  // 题目笔记相关
+  final QuestionNoteService _questionNoteService = QuestionNoteService();
+  Map<String, String> _questionNotes = {};
+  Map<String, bool> _isEditingQuestionNote = {};
+  Map<String, TextEditingController> _questionNoteControllers = {};
+  bool _questionNoteServiceInitialized = false;
 
   @override
   void initState() {
@@ -52,6 +60,31 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         }
       });
     }
+    
+    // 初始化题目笔记服务
+    _initQuestionNoteService();
+  }
+
+  Future<void> _initQuestionNoteService() async {
+    await _questionNoteService.init();
+    setState(() {
+      _questionNoteServiceInitialized = true;
+    });
+    // 加载所有题目笔记
+    _loadAllQuestionNotes();
+  }
+
+  Future<void> _loadAllQuestionNotes() async {
+    Map<String, String> notes = {};
+    for (var question in _currentNote.questions) {
+      final note = await _questionNoteService.getQuestionNote(question.id);
+      if (note != null) {
+        notes[question.id] = note;
+      }
+    }
+    setState(() {
+      _questionNotes = notes;
+    });
   }
 
   @override
@@ -60,6 +93,8 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     _contentController.dispose();
     _tabController.dispose();
     _titleFocusNode?.dispose(); // 释放焦点节点资源
+    // 释放所有题目笔记控制器
+    _questionNoteControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
   }
 
@@ -304,6 +339,9 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('成功生成$count道$questionTypeText')),
         );
+        
+        // 重新加载题目笔记
+        _loadAllQuestionNotes();
       }
     } catch (e) {
       if (mounted) {
@@ -518,6 +556,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
               itemCount: multipleChoiceQuestions.length,
               itemBuilder: (context, index) {
                 final question = multipleChoiceQuestions[index].questionData as MultipleChoiceQuestion;
+                final questionId = multipleChoiceQuestions[index].id;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16.0),
                   child: Padding(
@@ -525,19 +564,9 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                question.question,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.multipleChoice),
-                            ),
-                          ],
+                        Text(
+                          question.question,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         ...List.generate(question.options.length, (i) {
@@ -560,6 +589,11 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                             '解析: ${question.explanation}',
                             style: const TextStyle(fontStyle: FontStyle.italic),
                           ),
+                        ],
+                        // 题目笔记部分
+                        if (_questionNoteServiceInitialized) ...[
+                          const Divider(),
+                          _buildQuestionNoteWidget(questionId),
                         ],
                       ],
                     ),
@@ -631,6 +665,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
               itemCount: fillInBlankQuestions.length,
               itemBuilder: (context, index) {
                 final question = fillInBlankQuestions[index].questionData as FillInBlankQuestion;
+                final questionId = fillInBlankQuestions[index].id;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16.0),
                   child: Padding(
@@ -638,19 +673,9 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                question.question,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.fillInBlank),
-                            ),
-                          ],
+                        Text(
+                          question.question,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         Wrap(
@@ -670,6 +695,11 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                             '解析: ${question.explanation}',
                             style: const TextStyle(fontStyle: FontStyle.italic),
                           ),
+                        ],
+                        // 题目笔记部分
+                        if (_questionNoteServiceInitialized) ...[
+                          const Divider(),
+                          _buildQuestionNoteWidget(questionId),
                         ],
                       ],
                     ),
@@ -741,6 +771,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
               itemCount: shortAnswerQuestions.length,
               itemBuilder: (context, index) {
                 final question = shortAnswerQuestions[index].questionData as ShortAnswerQuestion;
+                final questionId = shortAnswerQuestions[index].id;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16.0),
                   child: Padding(
@@ -748,19 +779,9 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                question.question,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.shortAnswer),
-                            ),
-                          ],
+                        Text(
+                          question.question,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         const Text('可接受的答案:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -778,6 +799,11 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                             style: const TextStyle(fontStyle: FontStyle.italic),
                           ),
                         ],
+                        // 题目笔记部分
+                        if (_questionNoteServiceInitialized) ...[
+                          const Divider(),
+                          _buildQuestionNoteWidget(questionId),
+                        ],
                       ],
                     ),
                   ),
@@ -787,6 +813,133 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           ),
       ],
     );
+  }
+
+  /// 构建题目笔记组件
+  Widget _buildQuestionNoteWidget(String questionId) {
+    final questionNote = _questionNotes[questionId] ?? '';
+    
+    // 确保每个题目都有对应的控制器
+    if (!_questionNoteControllers.containsKey(questionId)) {
+      _questionNoteControllers[questionId] = TextEditingController(text: questionNote);
+    } else {
+      // 更新控制器文本
+      _questionNoteControllers[questionId]?.text = questionNote;
+    }
+    
+    final isEditing = _isEditingQuestionNote[questionId] ?? false;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('笔记:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: () => _startEditingQuestionNote(questionId),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (isEditing)
+          _buildQuestionNoteEditor(questionId)
+        else
+          _buildQuestionNoteViewer(questionId),
+      ],
+    );
+  }
+
+  /// 构建题目笔记查看器
+  Widget _buildQuestionNoteViewer(String questionId) {
+    final questionNote = _questionNotes[questionId] ?? '';
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (questionNote.isEmpty) ...[
+          const Text('暂无笔记', style: TextStyle(color: Colors.grey)),
+        ] else ...[
+          Text(questionNote),
+        ],
+      ],
+    );
+  }
+
+  /// 构建题目笔记编辑器
+  Widget _buildQuestionNoteEditor(String questionId) {
+    final controller = _questionNoteControllers[questionId]!;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: '请输入笔记内容...',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            isDense: true,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => _cancelEditingQuestionNote(questionId),
+              child: const Text('取消'),
+              // style: TextButton.styleFrom(
+              //   padding: EdgeInsets.zero,
+              //   minimumSize: const Size(40, 30),
+              //   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              // ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: () => _saveQuestionNote(questionId),
+              child: const Text('保存'),
+              // style: FilledButton.styleFrom(
+              //   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              //   minimumSize: const Size(50, 30),
+              //   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              // ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 开始编辑题目笔记
+  void _startEditingQuestionNote(String questionId) {
+    setState(() {
+      _isEditingQuestionNote[questionId] = true;
+    });
+  }
+
+  /// 取消编辑题目笔记
+  void _cancelEditingQuestionNote(String questionId) {
+    final questionNote = _questionNotes[questionId] ?? '';
+    setState(() {
+      _isEditingQuestionNote[questionId] = false;
+      _questionNoteControllers[questionId]?.text = questionNote;
+    });
+  }
+
+  /// 保存题目笔记
+  Future<void> _saveQuestionNote(String questionId) async {
+    final controller = _questionNoteControllers[questionId]!;
+    await _questionNoteService.saveQuestionNote(questionId, controller.text);
+    
+    setState(() {
+      _questionNotes[questionId] = controller.text;
+      _isEditingQuestionNote[questionId] = false;
+    });
   }
 
   Future<void> _confirmDeleteQuestion(int index, QuestionType type) async {
@@ -895,6 +1048,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
         filteredIndex++;
       }
     }
+    
+    // 删除题目对应的笔记
+    final questionId = updatedQuestions[actualIndex].id;
+    _questionNoteService.deleteQuestionNote(questionId);
     
     updatedQuestions.removeAt(actualIndex);
     final updatedNote = _currentNote.copyWith(questions: updatedQuestions);
