@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 class MultipleChoiceQuestion {
   final String question;
@@ -95,13 +96,22 @@ class ShortAnswerQuestion {
 enum QuestionType { multipleChoice, fillInBlank, shortAnswer }
 
 class AIQuestion {
+  final String id;
   final QuestionType type;
   final dynamic questionData;
 
   AIQuestion({
+    String? id,
     required this.type,
     required this.questionData,
-  });
+  }) : id = id ?? _generateId();
+
+  static String _generateId() {
+    final random = Random();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final randomSuffix = random.nextInt(1000000);
+    return '$timestamp-$randomSuffix';
+  }
 
   Map<String, dynamic> toJson() {
     late Map<String, dynamic> data;
@@ -118,12 +128,14 @@ class AIQuestion {
     }
 
     return {
+      'id': id,
       'type': type.index,
       'questionData': data,
     };
   }
 
   factory AIQuestion.fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String?;
     final typeIndex = json['type'] as int;
     final type = QuestionType.values[typeIndex];
     final questionDataJson = json['questionData'] as Map<String, dynamic>;
@@ -142,6 +154,7 @@ class AIQuestion {
     }
 
     return AIQuestion(
+      id: id,
       type: type,
       questionData: questionData,
     );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'ai/ai_question.dart';
@@ -6,6 +7,7 @@ import 'note.dart';
 import 'note_service.dart';
 import 'srs_service.dart';
 import 'stats_service.dart';
+import 'question_note_service.dart';
 
 class StudyPage extends StatefulWidget {
   const StudyPage({super.key});
@@ -18,12 +20,17 @@ class _StudyPageState extends State<StudyPage> {
   final NoteService _noteService = NoteService();
   final StatsService _statsService = StatsService();
   final SRSService _srsService = SRSService();
+  final QuestionNoteService _questionNoteService = QuestionNoteService();
   List<Note> _notes = [];
   List<AIQuestion> _allQuestions = [];
   List<int> _questionToNoteIndex = [];
   int _currentQuestionIndex = 0;
   int _slideDirection = 1;
   bool _showAnswer = false;
+  bool _showNoteEditor = false;
+  String _currentQuestionNote = '';
+  bool _isEditingNote = false;
+  TextEditingController _noteController = TextEditingController();
 
   DateTime? _startTime;
   Timer? _studyTimer;
@@ -42,12 +49,14 @@ class _StudyPageState extends State<StudyPage> {
   @override
   void dispose() {
     _studyTimer?.cancel();
+    _noteController.dispose();
     super.dispose();
   }
 
   Future<void> _loadNotesAndQuestions() async {
     await _noteService.init();
     await _statsService.init();
+    await _questionNoteService.init();
     final notes = await _noteService.loadNotes();
     final allQuestions = _extractAllQuestions(notes);
     setState(() {
@@ -57,6 +66,8 @@ class _StudyPageState extends State<StudyPage> {
       _showAnswer = false;
       _userAnswers = List.filled(allQuestions.length, null);
       _selectedOptions = List.filled(allQuestions.length, null);
+      _showNoteEditor = false;
+      _isEditingNote = false;
     });
   }
 
@@ -100,7 +111,17 @@ class _StudyPageState extends State<StudyPage> {
   void _toggleAnswer() {
     setState(() {
       _showAnswer = !_showAnswer;
+      _showNoteEditor = _showAnswer; // 显示答案时显示笔记编辑器
+      // 重置当前显示的笔记内容
+      if (_showAnswer) {
+        _currentQuestionNote = '';
+      }
     });
+    
+    // 显示答案时加载当前题目的笔记
+    if (_showAnswer) {
+      _loadCurrentQuestionNote();
+    }
   }
 
   void _previousQuestion() {
@@ -109,7 +130,16 @@ class _StudyPageState extends State<StudyPage> {
         _slideDirection = -1;
         _currentQuestionIndex--;
         _showAnswer = _userAnswers[_currentQuestionIndex] != null;
+        _showNoteEditor = false; // 切换题目时隐藏笔记编辑器
+        _isEditingNote = false; // 重置编辑状态
+        // 立即重置当前显示的笔记内容，避免显示前一道题的笔记
+        _currentQuestionNote = '';
       });
+      
+      // 如果已显示答案，则加载当前题目的笔记
+      if (_showAnswer) {
+        _loadCurrentQuestionNote();
+      }
     }
   }
 
@@ -120,7 +150,16 @@ class _StudyPageState extends State<StudyPage> {
         _currentQuestionIndex++;
         // Restore the answer visibility if the user has already answered this question.
         _showAnswer = _userAnswers[_currentQuestionIndex] != null;
+        _showNoteEditor = false; // 切换题目时隐藏笔记编辑器
+        _isEditingNote = false; // 重置编辑状态
+        // 立即重置当前显示的笔记内容，避免显示前一道题的笔记
+        _currentQuestionNote = '';
       });
+      
+      // 如果已显示答案，则加载当前题目的笔记
+      if (_showAnswer) {
+        _loadCurrentQuestionNote();
+      }
     }
   }
 
@@ -143,7 +182,13 @@ class _StudyPageState extends State<StudyPage> {
       _userAnswers[_currentQuestionIndex] = isCorrect;
       _statsService.recordAnswerResult(isCorrect);
       _showAnswer = true;
+      _showNoteEditor = true; // 显示笔记编辑器
+      // 重置当前显示的笔记内容
+      _currentQuestionNote = '';
     });
+    
+    // 加载当前题目的笔记
+    _loadCurrentQuestionNote();
   }
 
   Future<void> _handleSRSScore(int quality) async {
@@ -198,6 +243,12 @@ class _StudyPageState extends State<StudyPage> {
         });
       }
     }
+
+    // 重置笔记编辑状态
+    setState(() {
+      _showNoteEditor = false;
+      _isEditingNote = false;
+    });
 
     showDialog(
       context: context,
@@ -323,6 +374,8 @@ class _StudyPageState extends State<StudyPage> {
               const SizedBox(height: 20),
               if (_userAnswers[_currentQuestionIndex] != null)
                 _buildSRSRatingWidget(),
+              const SizedBox(height: 20),
+              _buildQuestionNoteWidget(), // 添加题目笔记组件
             ],
           ],
         ),
@@ -580,6 +633,132 @@ class _StudyPageState extends State<StudyPage> {
         ),
       ),
     );
+  }
+
+  /// 构建题目笔记组件
+  Widget _buildQuestionNoteWidget() {
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.3),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('题目笔记',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                // 始终显示编辑按钮，用于创建或编辑笔记
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: _startEditingNote,
+                  tooltip: _currentQuestionNote.isEmpty ? '添加笔记' : '编辑笔记',
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_isEditingNote)
+              _buildNoteEditor()
+            else
+              _buildNoteViewer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 构建笔记查看器
+  Widget _buildNoteViewer() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_currentQuestionNote.isEmpty) ...[
+          const Center(
+            child: Text('暂无笔记'),
+          ),
+        ] else ...[
+          Text(_currentQuestionNote),
+        ],
+      ],
+    );
+  }
+
+  /// 构建笔记编辑器
+  Widget _buildNoteEditor() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _noteController,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: '请输入笔记内容...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: _cancelEditingNote,
+              child: const Text('取消'),
+            ),
+            const SizedBox(width: 10),
+            FilledButton(
+              onPressed: _saveCurrentQuestionNote,
+              child: const Text('保存'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 获取当前问题的唯一标识符
+  String _getCurrentQuestionId() {
+    final currentQuestion = _allQuestions[_currentQuestionIndex];
+    // 使用问题的唯一ID作为标识符
+    return currentQuestion.id;
+  }
+
+  /// 加载当前题目的笔记
+  Future<void> _loadCurrentQuestionNote() async {
+    final questionId = _getCurrentQuestionId();
+    final note = await _questionNoteService.getQuestionNote(questionId);
+    setState(() {
+      _currentQuestionNote = note ?? '';
+      _noteController.text = _currentQuestionNote;
+    });
+  }
+
+  /// 保存当前题目的笔记
+  Future<void> _saveCurrentQuestionNote() async {
+    final questionId = _getCurrentQuestionId();
+    await _questionNoteService.saveQuestionNote(questionId, _noteController.text);
+    setState(() {
+      _currentQuestionNote = _noteController.text;
+      _isEditingNote = false;
+    });
+  }
+
+  /// 开始编辑笔记
+  void _startEditingNote() {
+    setState(() {
+      _isEditingNote = true;
+      _showNoteEditor = true;
+      _noteController.text = _currentQuestionNote;
+    });
+  }
+
+  /// 取消编辑笔记
+  void _cancelEditingNote() {
+    setState(() {
+      _isEditingNote = false;
+      _noteController.text = _currentQuestionNote;
+    });
   }
 }
 
