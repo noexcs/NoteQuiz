@@ -239,10 +239,26 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
 
     try {
       final aiService = AIService();
+      
+      // 将现有问题转换为Map格式，传递给AI服务以避免重复
+      final existingQuestions = _currentNote.questions
+          .where((q) => q.type == type) 
+          .map((q) {
+            switch (q.type) {
+              case QuestionType.multipleChoice:
+                return (q.questionData as MultipleChoiceQuestion).toJson();
+              case QuestionType.fillInBlank:
+                return (q.questionData as FillInBlankQuestion).toJson();
+              case QuestionType.shortAnswer:
+                return (q.questionData as ShortAnswerQuestion).toJson();
+            }
+          }).toList();
+      
       final result = await aiService.generateQuestions(
         content: _currentNote.content,
         questionType: questionTypeText,
         count: count,
+        existingQuestions: existingQuestions,
       );
 
       final List<AIQuestion> newQuestions = [];

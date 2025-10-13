@@ -183,6 +183,7 @@ Return ONLY a valid JSON object in this exact format with no additional text:
     required String content,
     required String questionType,
     required int count,
+    List<Map<String, dynamic>>? existingQuestions,
   }) async {
     await initialize();
     final url = Uri.parse('$_baseUrl/chat/completions');
@@ -208,6 +209,12 @@ Return ONLY a valid JSON object in this exact format with no additional text:
         requirementsPrompt = _questionRequirementsPrompt;
     }
 
+    String existingQuestionsText = '';
+    if (existingQuestions != null && existingQuestions.isNotEmpty) {
+      final existingQuestionsJson = jsonEncode(existingQuestions);
+      existingQuestionsText = '\n\nExisting questions (DO NOT generate duplicates of these questions):\n$existingQuestionsJson\n\nEnsure all generated questions are UNIQUE and not similar to the existing ones.';
+    }
+
     final messages = [
       {'role': 'system', 'content': systemPrompt},
       {
@@ -221,6 +228,7 @@ $content
 
 $requirementsPrompt
 
+$existingQuestionsText
 
 $_questionUserPrompt
 ''',
