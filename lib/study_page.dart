@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ai/ai_question.dart';
 import 'note.dart';
@@ -22,6 +23,7 @@ class _StudyPageState extends State<StudyPage> {
   final SRSService _srsService = SRSService();
   final QuestionNoteService _questionNoteService = QuestionNoteService();
   List<Note> _notes = [];
+  List<Note> _selectedNotes = [];
   List<AIQuestion> _allQuestions = [];
   List<int> _questionToNoteIndex = [];
   int _currentQuestionIndex = 0;
@@ -30,6 +32,7 @@ class _StudyPageState extends State<StudyPage> {
   bool _showNoteEditor = false;
   String _currentQuestionNote = '';
   bool _isEditingNote = false;
+  bool _showNoteSelection = true; // 控制是否显示笔记选择界面
   TextEditingController _noteController = TextEditingController();
 
   DateTime? _startTime;
@@ -43,7 +46,7 @@ class _StudyPageState extends State<StudyPage> {
   void initState() {
     super.initState();
     _loadNotesAndQuestions();
-    _startStudyTimer();
+    //_startStudyTimer(); // 在选择笔记之前不启动计时器
   }
 
   @override
@@ -58,17 +61,52 @@ class _StudyPageState extends State<StudyPage> {
     await _statsService.init();
     await _questionNoteService.init();
     final notes = await _noteService.loadNotes();
-    final allQuestions = _extractAllQuestions(notes);
+    
+    // 加载上次保存的笔记选择
+    final selectedNoteIds = await _loadSelectedNoteIds();
+    List<Note> selectedNotes = [];
+    if (selectedNoteIds.isEmpty) {
+      // 如果没有保存的选择，则默认选择所有笔记
+      selectedNotes = List.from(notes);
+      // 如果有笔记，默认显示选择界面
+      if (notes.isNotEmpty) {
+        setState(() {
+          _showNoteSelection = true;
+        });
+      }
+    } else {
+      // 根据保存的ID选择笔记
+      selectedNotes = notes.where((note) => selectedNoteIds.contains(note.id)).toList();
+    }
+    
     setState(() {
       _notes = notes;
-      _allQuestions = allQuestions;
-      _currentQuestionIndex = 0;
-      _showAnswer = false;
-      _userAnswers = List.filled(allQuestions.length, null);
-      _selectedOptions = List.filled(allQuestions.length, null);
+      _selectedNotes = selectedNotes;
+      // 只有在不显示选择界面时才提取问题
+      if (!_showNoteSelection) {
+        final allQuestions = _extractAllQuestions(selectedNotes);
+        _allQuestions = allQuestions;
+        _currentQuestionIndex = 0;
+        _showAnswer = false;
+        _userAnswers = List.filled(allQuestions.length, null);
+        _selectedOptions = List.filled(allQuestions.length, null);
+      }
       _showNoteEditor = false;
       _isEditingNote = false;
     });
+  }
+
+  // 加载上次保存的笔记选择
+  Future<List<String>> _loadSelectedNoteIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final selectedIds = prefs.getStringList('selected_note_ids') ?? [];
+    return selectedIds;
+  }
+
+  // 保存笔记选择
+  Future<void> _saveSelectedNoteIds(List<String> noteIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('selected_note_ids', noteIds);
   }
 
   List<AIQuestion> _extractAllQuestions(List<Note> notes) {
@@ -193,9 +231,16 @@ class _StudyPageState extends State<StudyPage> {
 
   Future<void> _handleSRSScore(int quality) async {
     int noteIndex = _questionToNoteIndex[_currentQuestionIndex];
-    Note currentNote = _notes[noteIndex];
+    Note currentNote = _selectedNotes[noteIndex];
     Note updatedNote = _srsService.updateNoteSRS(currentNote, quality);
-    _notes[noteIndex] = updatedNote;
+    _selectedNotes[noteIndex] = updatedNote;
+    
+    // 更新完整笔记列表中的对应笔记
+    final originalNoteIndex = _notes.indexWhere((note) => note.id == updatedNote.id);
+    if (originalNoteIndex != -1) {
+      _notes[originalNoteIndex] = updatedNote;
+    }
+    
     await _noteService.saveNotes(_notes);
 
     if (_currentQuestionIndex < _allQuestions.length - 1) {
@@ -264,16 +309,73 @@ class _StudyPageState extends State<StudyPage> {
           onRestart: () {
             Navigator.of(context).pop();
             setState(() {
+              // 重新加载笔记和问题
               _loadNotesAndQuestions();
-              _startStudyTimer();
+              //_startStudyTimer(); // 在_startStudy中启动
             });
           },
           onClose: () {
             Navigator.of(context).pop();
+            // 返回笔记选择界面
+            setState(() {
+              _showNoteSelection = true;
+              _allQuestions = [];
+              _currentQuestionIndex = 0;
+            });
           },
         );
       },
     );
+  }
+
+  // 开始学习，隐藏笔记选择界面
+  void _startStudy() {
+    setState(() {
+      _showNoteSelection = false;
+    });
+    final allQuestions = _extractAllQuestions(_selectedNotes);
+    setState(() {
+      _allQuestions = allQuestions;
+      _currentQuestionIndex = 0;
+      _showAnswer = false;
+      _userAnswers = List.filled(allQuestions.length, null);
+      _selectedOptions = List.filled(allQuestions.length, null);
+    });
+    _startStudyTimer(); // 在开始学习时启动计时器
+  }
+
+  // 更新笔记选择
+  void _updateNoteSelection(Note note, bool isSelected) {
+    setState(() {
+      if (isSelected) {
+        if (!_selectedNotes.contains(note)) {
+          _selectedNotes.add(note);
+        }
+      } else {
+        _selectedNotes.removeWhere((n) => n.id == note.id);
+      }
+    });
+  }
+
+  // 保存并应用笔记选择
+  void _saveAndApplyNoteSelection() async {
+    final selectedNoteIds = _selectedNotes.map((note) => note.id).toList();
+    await _saveSelectedNoteIds(selectedNoteIds);
+    _startStudy();
+  }
+
+  // 全选所有笔记
+  void _selectAllNotes() {
+    setState(() {
+      _selectedNotes = List.from(_notes);
+    });
+  }
+
+  // 取消全选
+  void _deselectAllNotes() {
+    setState(() {
+      _selectedNotes.clear();
+    });
   }
 
   @override
@@ -287,7 +389,7 @@ class _StudyPageState extends State<StudyPage> {
       appBar: AppBar(
         title: const Text('学习'),
         actions: [
-          if (_allQuestions.isNotEmpty)
+          if (_allQuestions.isNotEmpty && !_showNoteSelection)
             Padding(
               padding: const EdgeInsets.only(right: 8.0),
               child: TextButton(
@@ -297,18 +399,86 @@ class _StudyPageState extends State<StudyPage> {
             )
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(4.0),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: colorScheme.surfaceVariant.withOpacity(0.2),
+                preferredSize: const Size.fromHeight(4.0),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: colorScheme.surfaceVariant.withOpacity(0.2),
+                ),
+              ),
+      ),
+      body: _showNoteSelection 
+          ? _buildNoteSelectionBody() 
+          : _allQuestions.isEmpty
+              ? _buildEmptyState(colorScheme)
+              : _buildQuizBody(),
+      bottomNavigationBar: _showNoteSelection 
+          ? null 
+          : (_allQuestions.isEmpty ? null : _buildBottomAppBar(colorScheme)),
+    );
+  }
+
+  Widget _buildNoteSelectionBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '选择要学习的笔记',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '已选择 ${_selectedNotes.length}/${_notes.length} 个笔记',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  FilledButton(
+                    onPressed: _selectAllNotes,
+                    child: const Text('全选'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: _deselectAllNotes,
+                    child: const Text('清空'),
+                  ),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: _saveAndApplyNoteSelection,
+                    child: const Text('开始学习'),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-      ),
-      body: _allQuestions.isEmpty
-          ? _buildEmptyState(colorScheme)
-          : _buildQuizBody(),
-      bottomNavigationBar:
-          _allQuestions.isEmpty ? null : _buildBottomAppBar(colorScheme),
+        const Divider(),
+        Expanded(
+          child: _notes.isEmpty
+              ? const Center(
+                  child: Text('暂无笔记，请先添加笔记'),
+                )
+              : ListView.builder(
+                  itemCount: _notes.length,
+                  itemBuilder: (context, index) {
+                    final note = _notes[index];
+                    final isSelected = _selectedNotes.any((n) => n.id == note.id);
+                    return CheckboxListTile(
+                      title: Text(note.title),
+                      value: isSelected,
+                      onChanged: (bool? value) {
+                        _updateNoteSelection(note, value ?? false);
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
@@ -327,6 +497,15 @@ class _StudyPageState extends State<StudyPage> {
             '暂无题目，请先添加笔记并生成题目',
             style: TextStyle(fontSize: 18),
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _showNoteSelection = true;
+              });
+            },
+            child: const Text('选择笔记'),
           ),
         ],
       ),
@@ -365,6 +544,21 @@ class _StudyPageState extends State<StudyPage> {
           key: ValueKey<int>(_currentQuestionIndex),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _showNoteSelection = true;
+                    });
+                  },
+                  icon: const Icon(Icons.edit_note),
+                  label: const Text('更改笔记'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             _buildQuestionWidget(_allQuestions[_currentQuestionIndex]),
             if (_showAnswer) ...[
               const SizedBox(height: 20),
