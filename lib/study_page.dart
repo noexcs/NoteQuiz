@@ -212,6 +212,9 @@ class _StudyPageState extends State<StudyPage> {
         _statsService.recordAnswerResult(isCorrect);
         _showAnswer = true;
       });
+      
+      // 加载当前题目的笔记
+      _loadCurrentQuestionNote();
     }
   }
 
@@ -544,21 +547,6 @@ class _StudyPageState extends State<StudyPage> {
           key: ValueKey<int>(_currentQuestionIndex),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _showNoteSelection = true;
-                    });
-                  },
-                  icon: const Icon(Icons.edit_note),
-                  label: const Text('更改笔记'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
             _buildQuestionWidget(_allQuestions[_currentQuestionIndex]),
             if (_showAnswer) ...[
               const SizedBox(height: 20),
@@ -921,11 +909,23 @@ class _StudyPageState extends State<StudyPage> {
   /// 加载当前题目的笔记
   Future<void> _loadCurrentQuestionNote() async {
     final questionId = _getCurrentQuestionId();
-    final note = await _questionNoteService.getQuestionNote(questionId);
-    setState(() {
-      _currentQuestionNote = note ?? '';
-      _noteController.text = _currentQuestionNote;
-    });
+    try {
+      final note = await _questionNoteService.getQuestionNote(questionId);
+      if (mounted) {
+        setState(() {
+          _currentQuestionNote = note ?? '';
+          _noteController.text = _currentQuestionNote;
+        });
+      }
+    } catch (e) {
+      // 处理可能的异常
+      if (mounted) {
+        setState(() {
+          _currentQuestionNote = '';
+          _noteController.text = '';
+        });
+      }
+    }
   }
 
   /// 保存当前题目的笔记
