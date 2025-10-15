@@ -30,7 +30,7 @@ class _MyAppState extends State<MyApp> {
   Future<void> _loadThemePreference() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _themeMode = prefs.getString('app_theme') ?? 'dark';
+      _themeMode = prefs.getString('app_theme') ?? 'light';
       
       // 加载自定义主题色
       final primarySwatchValue = prefs.getInt('primary_swatch') ?? Colors.blue.value;

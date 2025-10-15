@@ -107,7 +107,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _currentThemeMode = prefs.getString('app_theme') ?? 'dark';
+      _currentThemeMode = prefs.getString('app_theme') ?? 'light';
 
       // Load API configs
       final configsString = prefs.getString('api_configs');
