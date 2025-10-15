@@ -62,6 +62,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
     }
     
     // 初始化题目笔记服务
+    print('_initQuestionNoteService');
     _initQuestionNoteService();
   }
 

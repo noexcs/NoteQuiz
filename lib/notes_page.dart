@@ -147,7 +147,7 @@ class _NotesPageState extends State<NotesPage> {
       ),
     );
 
-    if (result != null && mounted) {
+    if (mounted) {
       await _loadData();
     }
   }
@@ -418,11 +418,24 @@ class _NotesPageState extends State<NotesPage> {
 
   Widget _buildContent() {
     if (_subdirectories.isEmpty && _currentNotes.isEmpty) {
-      return const Center(
-        child: Text(
-          '暂无内容，请添加新笔记或目录',
-          style: TextStyle(fontSize: 18, color: Colors.grey),
-        ),
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          if (currentDirectory.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.arrow_upward),
+              title: const Text('..'),
+              onTap: _navigateUp,
+            ),
+          const Expanded(
+            child: Center(
+              child: Text(
+                '暂无内容，请添加新笔记或目录',
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            ),
+          ),
+        ],
       );
     }
 
