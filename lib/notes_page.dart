@@ -31,6 +31,11 @@ class _NotesPageState extends State<NotesPage> {
   bool _isSelectionMode = false;
   final Set<String> _selectedItems = {}; // 存储选中的项目ID（笔记ID或目录名）
 
+  // 剪切板状态变量
+  bool _isCutMode = false;
+  Set<String> _cutItems = {}; // 存储被剪切的项目ID
+  String _cutSourceDirectory = ''; // 剪切源目录
+
   @override
   void initState() {
     super.initState();
@@ -271,6 +276,110 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
+  // --- 移动功能相关方法 ---
+
+  Future<void> _cutSelectedItems() async {
+    if (_selectedItems.isEmpty) return;
+    
+    setState(() {
+      _isCutMode = true;
+      _cutItems = Set<String>.from(_selectedItems);
+      _cutSourceDirectory = currentDirectory;
+      _isSelectionMode = false;
+      _selectedItems.clear();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已剪切，浏览到目标目录后点击粘贴')),
+    );
+  }
+
+  Future<void> _pasteItems() async {
+    if (_cutItems.isEmpty) return;
+
+    final targetDirectory = currentDirectory;
+    int moveCount = 0;
+
+    try {
+      for (final itemId in _cutItems) {
+        // 判断是笔记还是目录
+        final isNote = _allNotes.any((note) => note.id == itemId);
+
+        if (isNote) {
+          // 移动笔记
+          final note = _allNotes.firstWhere((note) => note.id == itemId);
+          final updatedNote = note.copyWith(directory: targetDirectory);
+          await _noteService.updateNote(updatedNote);
+          moveCount++;
+        } else {
+          // 移动目录
+          final oldFullPath = _cutSourceDirectory.isEmpty 
+              ? itemId 
+              : '$_cutSourceDirectory/$itemId';
+          
+          final newFullPath = targetDirectory.isEmpty 
+              ? itemId 
+              : '$targetDirectory/$itemId';
+
+          // 检查目标目录是否已存在同名目录
+          final allDirectories = await _directoryService.loadDirectories();
+          final directoryExists = allDirectories.contains(newFullPath);
+          if (directoryExists) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('目录 "$itemId" 在目标位置已存在')),
+              );
+            }
+            continue;
+          }
+
+          await _directoryService.renameDirectory(oldFullPath, newFullPath);
+
+          // 更新目录内笔记的路径
+          final notesToUpdate = _allNotes.where((note) =>
+              note.directory != null &&
+              (note.directory == oldFullPath || note.directory!.startsWith('$oldFullPath/')));
+
+          for (final note in notesToUpdate) {
+            final newDirectoryPath = note.directory!.replaceFirst(
+                RegExp('^$oldFullPath'), newFullPath);
+            await _noteService.updateNote(note.copyWith(directory: newDirectoryPath));
+          }
+          moveCount++;
+        }
+      }
+
+      // 重置剪切状态
+      setState(() {
+        _isCutMode = false;
+        _cutItems.clear();
+        _cutSourceDirectory = '';
+      });
+
+      await _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('成功移动 $moveCount 个项目')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('移动过程中发生错误')),
+        );
+      }
+    }
+  }
+
+  void _cancelCutMode() {
+    setState(() {
+      _isCutMode = false;
+      _cutItems.clear();
+      _cutSourceDirectory = '';
+    });
+  }
+
   // --- 导航和多选模式 ---
 
   void _navigateToDirectory(String directory) {
@@ -391,6 +500,10 @@ class _NotesPageState extends State<NotesPage> {
         actions: _isSelectionMode
             ? [
                 IconButton(
+                  icon: const Icon(Icons.content_cut),
+                  onPressed: _selectedItems.isEmpty ? null : _cutSelectedItems,
+                ),
+                IconButton(
                   icon: const Icon(Icons.delete),
                   onPressed: _selectedItems.isEmpty ? null : _deleteSelectedItems,
                 ),
@@ -413,6 +526,25 @@ class _NotesPageState extends State<NotesPage> {
         onPressed: _showAddOptions,
         child: const Icon(Icons.add),
       ),
+      bottomNavigationBar: _isCutMode 
+          ? BottomAppBar(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _pasteItems,
+                    icon: const Icon(Icons.content_paste),
+                    label: const Text('粘贴'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _cancelCutMode,
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('取消'),
+                  ),
+                ],
+              ),
+            )
+          : null,
     );
   }
 
@@ -455,13 +587,17 @@ class _NotesPageState extends State<NotesPage> {
 
   Widget _buildDirectoryItem(String dir) {
     final isSelected = _selectedItems.contains(dir);
+    final isCut = _isCutMode && _cutItems.contains(dir) && currentDirectory == _cutSourceDirectory;
+    
     return ListTile(
       leading: _isSelectionMode
           ? Checkbox(
               value: isSelected,
               onChanged: (_) => _toggleItemSelected(dir),
             )
-          : const Icon(Icons.folder),
+          : isCut
+              ? const Icon(Icons.content_cut, color: Colors.red)
+              : const Icon(Icons.folder),
       title: Text(dir),
       onTap: () => _navigateToDirectory(dir),
       onLongPress: () {
@@ -481,19 +617,23 @@ class _NotesPageState extends State<NotesPage> {
               ],
             )
           : null,
-      selected: isSelected,
+      selected: isSelected || isCut,
     );
   }
 
   Widget _buildNoteItem(Note note) {
     final isSelected = _selectedItems.contains(note.id);
+    final isCut = _isCutMode && _cutItems.contains(note.id) && note.directory == _cutSourceDirectory;
+    
     return ListTile(
       leading: _isSelectionMode
           ? Checkbox(
               value: isSelected,
               onChanged: (_) => _toggleItemSelected(note.id),
             )
-          : const Icon(Icons.description),
+          : isCut
+              ? const Icon(Icons.content_cut, color: Colors.red)
+              : const Icon(Icons.description),
       title: Text(note.title.isEmpty ? '(无标题)' : note.title),
       onTap: _isSelectionMode ? () => _toggleItemSelected(note.id) : () => _editNote(note),
       onLongPress: () {
@@ -507,7 +647,7 @@ class _NotesPageState extends State<NotesPage> {
               onPressed: () => _deleteNote(note.id),
             )
           : null,
-      selected: isSelected,
+      selected: isSelected || isCut,
     );
   }
 }
