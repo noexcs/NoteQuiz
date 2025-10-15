@@ -618,6 +618,16 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                           const Divider(),
                           _buildQuestionNoteWidget(questionId),
                         ],
+                        // 添加删除按钮
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.multipleChoice),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -724,6 +734,16 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                           const Divider(),
                           _buildQuestionNoteWidget(questionId),
                         ],
+                        // 添加删除按钮
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.fillInBlank),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -827,6 +847,16 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
                           const Divider(),
                           _buildQuestionNoteWidget(questionId),
                         ],
+                        // 添加删除按钮
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _confirmDeleteQuestion(index, QuestionType.shortAnswer),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
