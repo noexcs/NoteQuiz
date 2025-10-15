@@ -155,10 +155,6 @@ Return ONLY a valid JSON object in this exact format with no additional text:
   // --- Initialization ---
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString('api_base_url') ?? _defaultBaseUrl;
-    _apiKey = prefs.getString('api_key') ?? '';
-    _model = prefs.getString('api_model') ?? _defaultModel;
-
     // Load custom prompts, falling back to defaults if empty
     _questionSystemPrompt =
         prefs.getString('question_system_prompt')?.trim().isNotEmpty ?? false
@@ -171,6 +167,26 @@ Return ONLY a valid JSON object in this exact format with no additional text:
         ? prefs.getString('content_system_prompt')!
         : _defaultContentSystemPrompt;
     _contentUserPrompt = prefs.getString('content_user_prompt') ?? '';
+    
+    // Load API configs using the new multi-config approach
+    final configsString = prefs.getString('api_configs');
+    int currentConfigIndex = prefs.getInt('current_api_config_index') ?? 0;
+    
+    if (configsString != null) {
+      final List<dynamic> configsJson = jsonDecode(configsString);
+      if (configsJson.isNotEmpty && currentConfigIndex < configsJson.length) {
+        final currentConfig = configsJson[currentConfigIndex];
+        _baseUrl = currentConfig['baseUrl'] ?? _defaultBaseUrl;
+        _apiKey = currentConfig['apiKey'] ?? '';
+        _model = currentConfig['model'] ?? _defaultModel;
+        return;
+      }
+    }
+    
+    // Fallback to old config if new config not found
+    _baseUrl = prefs.getString('api_base_url') ?? _defaultBaseUrl;
+    _apiKey = prefs.getString('api_key') ?? '';
+    _model = prefs.getString('api_model') ?? _defaultModel;
   }
 
   // --- Public API Methods ---
