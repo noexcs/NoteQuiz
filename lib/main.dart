@@ -1,58 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'study_page.dart';
-import 'review_page.dart';
+
 import 'settings_page.dart';
 import 'notes_page.dart';
 import 'stats_page.dart';
-
-// 添加自定义绘制类
-class HeaderPainter extends CustomPainter {
-  final Color color;
-
-  HeaderPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-
-    // 绘制装饰性波浪线
-    path.moveTo(0, size.height * 0.85);
-    path.quadraticBezierTo(
-        size.width * 0.25, size.height * 0.95, size.width * 0.5, size.height * 0.85);
-    path.quadraticBezierTo(
-        size.width * 0.75, size.height * 0.75, size.width, size.height * 0.85);
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-
-    canvas.drawPath(path, paint);
-
-    // 绘制一些装饰性圆点
-    final dotPaint = Paint()
-      ..color = color.withOpacity(0.2)
-      ..style = PaintingStyle.fill;
-
-    // 在不同位置绘制圆点
-    canvas.drawCircle(
-        Offset(size.width * 0.1, size.height * 0.3), size.width * 0.03, dotPaint);
-    canvas.drawCircle(
-        Offset(size.width * 0.8, size.height * 0.4), size.width * 0.02, dotPaint);
-    canvas.drawCircle(
-        Offset(size.width * 0.9, size.height * 0.2), size.width * 0.025, dotPaint);
-    canvas.drawCircle(
-        Offset(size.width * 0.3, size.height * 0.2), size.width * 0.015, dotPaint);
-    canvas.drawCircle(
-        Offset(size.width * 0.6, size.height * 0.3), size.width * 0.02, dotPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 
 void main() {
   runApp(const MyApp());
@@ -128,10 +80,10 @@ class _MyAppState extends State<MyApp> {
               brightness: Brightness.dark,
             ),
           ),
-      home: const WelcomePage(),
+      home: MainScreen(onThemeChanged: _updateTheme, currentSwatch: _primarySwatch,),
       routes: {
         '/study': (context) => const StudyPage(),
-        '/review': (context) => const ReviewPage(),
+        
         '/settings': (context) => SettingsPage(
             onThemeChanged: _updateTheme,
             currentSwatch: _primarySwatch,
@@ -139,6 +91,74 @@ class _MyAppState extends State<MyApp> {
         '/notes': (context) => const NotesPage(),
         '/stats': (context) => const StatsPage(),
       },
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  final Function(String, [MaterialColor?]) onThemeChanged;
+  final MaterialColor currentSwatch;
+
+  const MainScreen({
+    super.key,
+    required this.onThemeChanged,
+    required this.currentSwatch,
+  });
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _currentIndex = 0;
+  
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      const NotesPage(),
+      const StudyPage(),
+      const StatsPage(),
+      SettingsPage(
+        onThemeChanged: widget.onThemeChanged,
+        currentSwatch: widget.currentSwatch,
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.note_alt_outlined),
+            label: '笔记',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.school),
+            label: '学习',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart_outlined),
+            label: '统计',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_outlined),
+            label: '设置',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -262,67 +282,7 @@ class WelcomePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 
-                // 复习卡片
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pushNamed(context, '/review');
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      height: 120,
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.refresh,
-                              size: 36,
-                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '复习',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  '巩固已有知识点',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_forward_ios,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+const SizedBox(height: 24),
                 
                 // 功能模块标题
                 Text(
@@ -366,14 +326,6 @@ class WelcomePage extends StatelessWidget {
                       subtitle: '个性化配置',
                       route: '/settings',
                       color: Colors.purple,
-                    ),
-                    _buildFeatureCard(
-                      context,
-                      icon: Icons.help_outline,
-                      title: '帮助',
-                      subtitle: '使用指南',
-                      route: '/help',
-                      color: Colors.teal,
                     ),
                   ],
                 ),
@@ -445,4 +397,52 @@ class WelcomePage extends StatelessWidget {
       ),
     );
   }
+}
+
+// 添加自定义绘制类
+class HeaderPainter extends CustomPainter {
+  final Color color;
+
+  HeaderPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+
+    // 绘制装饰性波浪线
+    path.moveTo(0, size.height * 0.85);
+    path.quadraticBezierTo(
+        size.width * 0.25, size.height * 0.95, size.width * 0.5, size.height * 0.85);
+    path.quadraticBezierTo(
+        size.width * 0.75, size.height * 0.75, size.width, size.height * 0.85);
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    canvas.drawPath(path, paint);
+
+    // 绘制一些装饰性圆点
+    final dotPaint = Paint()
+      ..color = color.withOpacity(0.2)
+      ..style = PaintingStyle.fill;
+
+    // 在不同位置绘制圆点
+    canvas.drawCircle(
+        Offset(size.width * 0.1, size.height * 0.3), size.width * 0.03, dotPaint);
+    canvas.drawCircle(
+        Offset(size.width * 0.8, size.height * 0.4), size.width * 0.02, dotPaint);
+    canvas.drawCircle(
+        Offset(size.width * 0.9, size.height * 0.2), size.width * 0.025, dotPaint);
+    canvas.drawCircle(
+        Offset(size.width * 0.3, size.height * 0.2), size.width * 0.015, dotPaint);
+    canvas.drawCircle(
+        Offset(size.width * 0.6, size.height * 0.3), size.width * 0.02, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -401,13 +401,13 @@ class _StudyPageState extends State<StudyPage> {
               ),
             )
         ],
-        bottom: PreferredSize(
+        bottom: _allQuestions.isNotEmpty && !_showNoteSelection ? PreferredSize(
                 preferredSize: const Size.fromHeight(4.0),
                 child: LinearProgressIndicator(
                   value: progress,
                   backgroundColor: colorScheme.surfaceVariant.withOpacity(0.2),
                 ),
-              ),
+              ) : null,
       ),
       body: _showNoteSelection 
           ? _buildNoteSelectionBody() 
@@ -425,7 +425,7 @@ class _StudyPageState extends State<StudyPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16.0,16.0,16.0,0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
