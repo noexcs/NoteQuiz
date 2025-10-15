@@ -183,6 +183,10 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
           _isEditing = false;
           _titleController.text = noteTitle; // 更新标题控制器的文本
         });
+        // 显示保存成功的提示，而不是直接关闭页面
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('笔记保存成功')),
+        );
         Navigator.pop(context, updatedNote);
       }
     });
@@ -475,7 +479,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          if (_isEditing)
+          if (_isEditing && !_isGenerating)
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
@@ -493,7 +497,7 @@ class _NoteDetailPageState extends State<NoteDetailPage> with SingleTickerProvid
             ),
           const SizedBox(height: 16),
           Expanded(
-            child: _isEditing
+            child: _isEditing && !_isGenerating
                 ? TextField(
                     controller: _contentController,
                     decoration: const InputDecoration(

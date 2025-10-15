@@ -9,7 +9,7 @@ class AIService {
 
   static const String _defaultContentSystemPrompt = '''
 You are a professional note-taking assistant who specializes in creating detailed and well-structured notes based on a title.
-Content should be in Markdown format and in Simplified Chinese.
+Content should be in Simplified Chinese.
 ''';
   static const String _contentRequirementsPrompt = '''
 Requirements for content generation:

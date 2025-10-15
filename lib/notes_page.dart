@@ -153,8 +153,15 @@ class _NotesPageState extends State<NotesPage> {
   }
 
   Future<void> _deleteNote(String id) async {
-    await _noteService.deleteNote(id);
-    await _loadData();
+    final confirmed = await _showConfirmationDialog(
+      title: '确认删除',
+      content: '确定要删除这条笔记吗？',
+    );
+
+    if (confirmed == true && mounted) {
+      await _noteService.deleteNote(id);
+      await _loadData();
+    }
   }
 
   Future<void> _addDirectory() async {
